@@ -292,6 +292,26 @@ export class LoyaltyRewardsRedemtionsService {
       ErrorHandler.notFound(ErrorMessage.LOYALTY_REWARDS_REDEMPTION_NOT_FOUND);
     }
 
+    if (updateLoyaltyRewardsRedemtionDto.reward_id) {
+      const reward = await this.loyaltyRewardRepo.findOneBy({
+        id: updateLoyaltyRewardsRedemtionDto.reward_id,
+      });
+
+      if (!reward) {
+        ErrorHandler.notFound(ErrorMessage.LOYALTY_REWARD_NOT_FOUND);
+      }
+    }
+
+    if (updateLoyaltyRewardsRedemtionDto.order_id) {
+      const order = await this.orderRepo.findOneBy({
+        id: updateLoyaltyRewardsRedemtionDto.order_id,
+      });
+
+      if (!order) {
+        ErrorHandler.notFound(ErrorMessage.ORDER_NOT_FOUND);
+      }
+    }
+
     Object.assign(redemption, updateLoyaltyRewardsRedemtionDto);
 
     try {
