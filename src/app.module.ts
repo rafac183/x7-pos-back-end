@@ -90,7 +90,6 @@ import { OnlineOrder } from './online-ordering-system/online-order/entities/onli
 import { OnlineOrderItemModule } from './online-ordering-system/online-order-item/online-order-item.module';
 import { OnlineOrderItem } from './online-ordering-system/online-order-item/entities/online-order-item.entity';
 import { QRMenuSection } from './qr-code/qr-menu-section/entity/qr-menu-section.entity';
-import { QrMenuSectionModule } from './qr-code/qr-menu-section/qr-menu-section.module';
 import { LoyaltyPointTransaction } from './loyalty/loyalty-points-transaction/entities/loyalty-points-transaction.entity';
 import { LoyaltyReward } from './loyalty/loyalty-reward/entities/loyalty-reward.entity';
 import { QRMenuSectionModule } from './qr-code/qr-menu-section/qr-menu-section.module';
@@ -98,6 +97,7 @@ import { QRMenuItem } from './qr-code/qr-menu-item/entity/qr-menu-item.entity';
 import { QRMenuItemModule } from './qr-code/qr-menu-item/qr-menu-item.module';
 import { QRLocation } from './qr-code/qr-location/entity/qr-location.entity';
 import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
+import { LoyaltyRewardsRedemtion } from './loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
 
 @Module({
   imports: [
@@ -165,6 +165,7 @@ import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
           LoyaltyCustomer,
           LoyaltyPointTransaction,
           LoyaltyReward,
+          LoyaltyRewardsRedemtion,
           OnlineMenuCategory,
           OnlineMenuItem,
           OnlineOrder,

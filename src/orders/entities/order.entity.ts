@@ -21,6 +21,7 @@ import { OrderType } from '../constants/order-type.enum';
 import { CashTransaction } from '../../cash-transactions/entities/cash-transaction.entity';
 import { Receipt } from '../../receipts/entities/receipt.entity';
 import { LoyaltyPointTransaction } from 'src/loyalty/loyalty-points-transaction/entities/loyalty-points-transaction.entity';
+import { LoyaltyRewardsRedemtion } from 'src/loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
 
 @Entity('orders')
 @Index(['merchant_id', 'status', 'created_at'])
@@ -173,6 +174,12 @@ export class Order {
     (loyaltyPointTransaction) => loyaltyPointTransaction.order,
   )
   loyaltyPointTransactions: LoyaltyPointTransaction[];
+
+  @OneToMany(
+    () => LoyaltyRewardsRedemtion,
+    (loyaltyRewardsRedemtion) => loyaltyRewardsRedemtion.order,
+  )
+  loyaltyRewardsRedemptions: LoyaltyRewardsRedemtion[];
 }
 
 /*
