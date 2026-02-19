@@ -12,6 +12,7 @@ import { AllPaginatedLoyaltyRewardsRedemtionDto } from './dto/all-paginated-loya
 import { LoyaltyRewardLittleResponseDto } from '../loyalty-reward/dto/loyalty-reward-response.dto';
 import { OrderLittleResponseDto } from 'src/orders/dto/order-response.dto';
 import { LoyaltyCustomerLittleResponseDto } from '../loyalty-customer/dto/loyalty-customer-response.dto';
+import { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interface';
 
 describe('LoyaltyRewardsRedemtionsController', () => {
   let controller: LoyaltyRewardsRedemtionsController;
@@ -39,6 +40,12 @@ describe('LoyaltyRewardsRedemtionsController', () => {
     message: 'Success',
     data: mockRedemptionDto,
   };
+
+  const mockUser = {
+    merchant: { id: 1 },
+  } as AuthenticatedUser;
+
+  const merchantId = mockUser.merchant.id;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -72,10 +79,10 @@ describe('LoyaltyRewardsRedemtionsController', () => {
 
       mockLoyaltyRewardsRedemtionsService.create.mockResolvedValue(mockOneResponse);
 
-      const result = await controller.create(dto);
+      const result = await controller.create(mockUser, dto);
 
       expect(result).toEqual(mockOneResponse);
-      expect(service.create).toHaveBeenCalledWith(dto);
+      expect(service.create).toHaveBeenCalledWith(merchantId, dto);
     });
 
     it('should handle service errors when creating a redemption', async () => {
@@ -87,7 +94,7 @@ describe('LoyaltyRewardsRedemtionsController', () => {
       };
       mockLoyaltyRewardsRedemtionsService.create.mockRejectedValue(new Error('Service Error'));
 
-      await expect(controller.create(dto)).rejects.toThrow('Service Error');
+      await expect(controller.create(mockUser, dto)).rejects.toThrow('Service Error');
     });
   });
 
@@ -109,16 +116,16 @@ describe('LoyaltyRewardsRedemtionsController', () => {
 
       mockLoyaltyRewardsRedemtionsService.findAll.mockResolvedValue(expectedResult);
 
-      const result = await controller.findAll(query);
+      const result = await controller.findAll(mockUser, query);
 
       expect(result).toEqual(expectedResult);
-      expect(service.findAll).toHaveBeenCalledWith(query);
+      expect(service.findAll).toHaveBeenCalledWith(query, merchantId);
     });
 
     it('should handle service errors when finding all redemptions', async () => {
       mockLoyaltyRewardsRedemtionsService.findAll.mockRejectedValue(new Error('Service Error'));
 
-      await expect(controller.findAll(query)).rejects.toThrow('Service Error');
+      await expect(controller.findAll(mockUser, query)).rejects.toThrow('Service Error');
     });
   });
 
@@ -128,16 +135,16 @@ describe('LoyaltyRewardsRedemtionsController', () => {
     it('should return a single redemption', async () => {
       mockLoyaltyRewardsRedemtionsService.findOne.mockResolvedValue(mockOneResponse);
 
-      const result = await controller.findOne(id);
+      const result = await controller.findOne(mockUser, id);
 
       expect(result).toEqual(mockOneResponse);
-      expect(service.findOne).toHaveBeenCalledWith(id);
+      expect(service.findOne).toHaveBeenCalledWith(id, merchantId);
     });
 
     it('should handle redemption not found', async () => {
       mockLoyaltyRewardsRedemtionsService.findOne.mockRejectedValue(new Error('Not Found'));
 
-      await expect(controller.findOne(id)).rejects.toThrow('Not Found');
+      await expect(controller.findOne(mockUser, id)).rejects.toThrow('Not Found');
     });
   });
 
@@ -148,16 +155,16 @@ describe('LoyaltyRewardsRedemtionsController', () => {
     it('should update a redemption', async () => {
       mockLoyaltyRewardsRedemtionsService.update.mockResolvedValue(mockOneResponse);
 
-      const result = await controller.update(id, dto);
+      const result = await controller.update(mockUser, id, dto);
 
       expect(result).toEqual(mockOneResponse);
-      expect(service.update).toHaveBeenCalledWith(id, dto);
+      expect(service.update).toHaveBeenCalledWith(id, merchantId, dto);
     });
 
     it('should handle service errors when updating a redemption', async () => {
       mockLoyaltyRewardsRedemtionsService.update.mockRejectedValue(new Error('Update Failed'));
 
-      await expect(controller.update(id, dto)).rejects.toThrow('Update Failed');
+      await expect(controller.update(mockUser, id, dto)).rejects.toThrow('Update Failed');
     });
   });
 
@@ -167,16 +174,16 @@ describe('LoyaltyRewardsRedemtionsController', () => {
     it('should remove a redemption', async () => {
       mockLoyaltyRewardsRedemtionsService.remove.mockResolvedValue(mockOneResponse);
 
-      const result = await controller.remove(id);
+      const result = await controller.remove(mockUser, id);
 
       expect(result).toEqual(mockOneResponse);
-      expect(service.remove).toHaveBeenCalledWith(id);
+      expect(service.remove).toHaveBeenCalledWith(id, merchantId);
     });
 
     it('should handle service errors when removing a redemption', async () => {
       mockLoyaltyRewardsRedemtionsService.remove.mockRejectedValue(new Error('Delete Failed'));
 
-      await expect(controller.remove(id)).rejects.toThrow('Delete Failed');
+      await expect(controller.remove(mockUser, id)).rejects.toThrow('Delete Failed');
     });
   });
 
@@ -198,17 +205,17 @@ describe('LoyaltyRewardsRedemtionsController', () => {
       mockLoyaltyRewardsRedemtionsService.update.mockResolvedValue({});
       mockLoyaltyRewardsRedemtionsService.remove.mockResolvedValue({});
 
-      await controller.create(createDto);
-      await controller.findAll(query);
-      await controller.findOne(id);
-      await controller.update(id, updateDto);
-      await controller.remove(id);
+      await controller.create(mockUser, createDto);
+      await controller.findAll(mockUser, query);
+      await controller.findOne(mockUser, id);
+      await controller.update(mockUser, id, updateDto);
+      await controller.remove(mockUser, id);
 
-      expect(mockLoyaltyRewardsRedemtionsService.create).toHaveBeenCalledWith(createDto);
-      expect(mockLoyaltyRewardsRedemtionsService.findAll).toHaveBeenCalledWith(query);
-      expect(mockLoyaltyRewardsRedemtionsService.findOne).toHaveBeenCalledWith(id);
-      expect(mockLoyaltyRewardsRedemtionsService.update).toHaveBeenCalledWith(id, updateDto);
-      expect(mockLoyaltyRewardsRedemtionsService.remove).toHaveBeenCalledWith(id);
+      expect(mockLoyaltyRewardsRedemtionsService.create).toHaveBeenCalledWith(merchantId, createDto);
+      expect(mockLoyaltyRewardsRedemtionsService.findAll).toHaveBeenCalledWith(query, merchantId);
+      expect(mockLoyaltyRewardsRedemtionsService.findOne).toHaveBeenCalledWith(id, merchantId);
+      expect(mockLoyaltyRewardsRedemtionsService.update).toHaveBeenCalledWith(id, merchantId, updateDto);
+      expect(mockLoyaltyRewardsRedemtionsService.remove).toHaveBeenCalledWith(id, merchantId);
     });
   });
 });

@@ -98,6 +98,7 @@ import { QRMenuItemModule } from './qr-code/qr-menu-item/qr-menu-item.module';
 import { QRLocation } from './qr-code/qr-location/entity/qr-location.entity';
 import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
 import { LoyaltyRewardsRedemtion } from './loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
+import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon.entity';
 
 @Module({
   imports: [
@@ -166,6 +167,7 @@ import { LoyaltyRewardsRedemtion } from './loyalty/loyalty-rewards-redemtions/en
           LoyaltyPointTransaction,
           LoyaltyReward,
           LoyaltyRewardsRedemtion,
+          LoyaltyCoupon,
           OnlineMenuCategory,
           OnlineMenuItem,
           OnlineOrder,

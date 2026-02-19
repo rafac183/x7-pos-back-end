@@ -37,8 +37,8 @@ import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { ErrorResponse } from 'src/common/dtos/error-response.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-// import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-// import { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interface';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interface';
 import { AllPaginatedLoyaltyRewardsRedemtionDto } from './dto/all-paginated-loyalty-rewards-redemtion.dto';
 import { OneLoyaltyRewardsRedemtionResponse } from './dto/loyalty-rewards-redemtion-response.dto';
 
@@ -89,11 +89,11 @@ export class LoyaltyRewardsRedemtionsController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized', type: ErrorResponse })
   @ApiBody({ type: CreateLoyaltyRewardsRedemtionDto })
   create(
-    // @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() createLoyaltyRewardsRedemtionDto: CreateLoyaltyRewardsRedemtionDto,
   ): Promise<OneLoyaltyRewardsRedemtionResponse> {
-    // const merchantId = user.merchant.id;
-    return this.loyaltyRewardsRedemtionsService.create(createLoyaltyRewardsRedemtionDto);
+    const merchantId = user.merchant.id;
+    return this.loyaltyRewardsRedemtionsService.create(merchantId, createLoyaltyRewardsRedemtionDto);
   }
 
   @Get()
@@ -156,11 +156,11 @@ export class LoyaltyRewardsRedemtionsController {
     type: ErrorResponse,
   })
   findAll(
-    // @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
     @Query() query: GetLoyaltyRewardsRedemtionsQueryDto,
   ): Promise<AllPaginatedLoyaltyRewardsRedemtionDto> {
-    // const merchantId = user.merchant.id;
-    return this.loyaltyRewardsRedemtionsService.findAll(query);
+    const merchantId = user.merchant.id;
+    return this.loyaltyRewardsRedemtionsService.findAll(query, merchantId);
   }
 
   @Get(':id')
@@ -189,11 +189,11 @@ export class LoyaltyRewardsRedemtionsController {
     type: ErrorResponse,
   })
   findOne(
-    // @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<OneLoyaltyRewardsRedemtionResponse> {
-    // const merchantId = user.merchant.id;
-    return this.loyaltyRewardsRedemtionsService.findOne(id);
+    const merchantId = user.merchant.id;
+    return this.loyaltyRewardsRedemtionsService.findOne(id, merchantId);
   }
 
   @Patch(':id')
@@ -218,13 +218,14 @@ export class LoyaltyRewardsRedemtionsController {
     type: ErrorResponse,
   })
   update(
-    // @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseIntPipe) id: number,
     @Body() updateLoyaltyRewardsRedemtionDto: UpdateLoyaltyRewardsRedemtionDto,
   ): Promise<OneLoyaltyRewardsRedemtionResponse> {
-    // const merchantId = user.merchant.id;
+    const merchantId = user.merchant.id;
     return this.loyaltyRewardsRedemtionsService.update(
       id,
+      merchantId,
       updateLoyaltyRewardsRedemtionDto,
     );
   }
@@ -250,10 +251,10 @@ export class LoyaltyRewardsRedemtionsController {
     type: ErrorResponse,
   })
   remove(
-    // @CurrentUser() user: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseIntPipe) id: number,
   ): Promise<OneLoyaltyRewardsRedemtionResponse> {
-    // const merchantId = user.merchant.id;
-    return this.loyaltyRewardsRedemtionsService.remove(id);
+    const merchantId = user.merchant.id;
+    return this.loyaltyRewardsRedemtionsService.remove(id, merchantId);
   }
 }

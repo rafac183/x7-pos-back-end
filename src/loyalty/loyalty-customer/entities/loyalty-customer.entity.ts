@@ -13,6 +13,7 @@ import { Customer } from '../../../customers/entities/customer.entity';
 import { LoyaltyTier } from '../../loyalty-tier/entities/loyalty-tier.entity';
 import { LoyaltyPointTransaction } from 'src/loyalty/loyalty-points-transaction/entities/loyalty-points-transaction.entity';
 import { LoyaltyRewardsRedemtion } from 'src/loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
+import { LoyaltyCoupon } from 'src/loyalty/loyalty-coupons/entities/loyalty-coupon.entity';
 
 @Entity('loyalty_customers')
 export class LoyaltyCustomer {
@@ -91,4 +92,10 @@ export class LoyaltyCustomer {
     (loyaltyRewardsRedemtion) => loyaltyRewardsRedemtion.loyaltyCustomer,
   )
   loyaltyRewardsRedemptions: LoyaltyRewardsRedemtion[];
+
+  @OneToMany(
+    () => LoyaltyCoupon,
+    (loyaltyCoupon) => loyaltyCoupon.loyaltyCustomer,
+  )
+  loyaltyCoupons: LoyaltyCoupon[];
 }

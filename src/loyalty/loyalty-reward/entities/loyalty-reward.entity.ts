@@ -13,6 +13,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Product } from 'src/products-inventory/products/entities/product.entity';
 import { LoyaltyProgram } from 'src/loyalty/loyalty-programs/entities/loyalty-program.entity';
 import { LoyaltyRewardsRedemtion } from 'src/loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
+import { LoyaltyCoupon } from 'src/loyalty/loyalty-coupons/entities/loyalty-coupon.entity';
 
 @Entity('loyalty_reward')
 export class LoyaltyReward {
@@ -123,4 +124,10 @@ export class LoyaltyReward {
     (loyaltyRewardsRedemtion) => loyaltyRewardsRedemtion.reward,
   )
   loyaltyRewardsRedemptions: LoyaltyRewardsRedemtion[];
+
+  @OneToMany(
+    () => LoyaltyCoupon,
+    (loyaltyCoupon) => loyaltyCoupon.reward,
+  )
+  loyaltyCoupons: LoyaltyCoupon[];
 }
