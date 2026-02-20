@@ -163,6 +163,22 @@ export class ErrorHandler {
     throw new NotFoundException(message);
   }
 
+  static qrOrderNotFound(
+    message: string = ErrorMessage.QR_ORDER_NOT_FOUND,
+  ): never {
+    throw new NotFoundException(message);
+  }
+
+  static customerNotFound(
+    message: string = ErrorMessage.CUSTOMER_NOT_FOUND,
+  ): never {
+    throw new NotFoundException(message);
+  }
+
+  static orderNotFound(message: string = ErrorMessage.ORDER_NOT_FOUND): never {
+    throw new NotFoundException(message);
+  }
+
   static resourceNotFound(resource: string, id?: number | string): never {
     const message = id
       ? `${resource} with ID ${id} not found`

@@ -1,14 +1,14 @@
-//src/qr-code/qr-menu/qr-menu.controller
+//src/qr-code/qr-order/qr-order.controller.ts
 import {
-  Body,
   Controller,
-  Get,
   Post,
   UseGuards,
+  Body,
+  Get,
   Query,
-  Param,
   ParseIntPipe,
   BadRequestException,
+  Param,
   Patch,
   Delete,
 } from '@nestjs/common';
@@ -18,33 +18,33 @@ import {
   ApiCreatedResponse,
   ApiForbiddenResponse,
   ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
   ApiUnauthorizedResponse,
-  ApiOkResponse,
-  ApiParam,
-  ApiNotFoundResponse,
 } from '@nestjs/swagger';
-import { QrMenuService } from './qr-menu.service';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/users/constants/role.enum';
-import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { Scope } from 'src/users/constants/scope.enum';
-import { CreateQRMenuDto } from './dto/create-qr-menu.dto';
 import {
-  OneQRMenuResponseDto,
-  QRMenuResponseDto,
-} from './dto/qr-menu-response.dto';
-import { PaginatedQRMenuResponseDto } from './dto/paginated-qr-menu-response.dto';
-import { QueryQRMenuDto } from './dto/query-qr-menu.dto';
-import { UpdateQRMenuDto } from './dto/update-qr-menu.dto';
+  OneQROrderResponseDto,
+  QROrderResponseDto,
+} from './dto/qr-order-response.dto';
+import { CreateQROrderDto } from './dto/create-qr-order.dto';
+import { QROrderService } from './qr-order.service';
+import { PaginatedQROrderResponseDto } from './dto/paginated-qr-order-response.dto';
+import { QueryQROrderDto } from './dto/query-qr-order.dto';
+import { UpdateQROrderDto } from './dto/update-qr-order.dto';
 
-@ApiTags('QR Menu')
-@Controller('qr-menu')
-export class QrMenuController {
-  constructor(private readonly qrMenuService: QrMenuService) {}
+@ApiTags('QR Orders')
+@Controller('qr-order')
+export class QROrderController {
+  constructor(private readonly qrOrderService: QROrderService) {}
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -56,25 +56,28 @@ export class QrMenuController {
     Scope.MERCHANT_CLOVER,
   )
   @ApiOperation({
-    summary: 'Create a new QR Menu',
-    description: 'Endpoint for creating a new QR Menu',
+    summary: 'Create a new QR Order',
+    description: 'Endpoint to create a new QR Order.',
   })
   @ApiBody({
-    type: CreateQRMenuDto,
-    description: 'Require data for a new QR Menu',
+    type: CreateQROrderDto,
+    description: 'Require data for a new QR Order',
   })
   @ApiCreatedResponse({
-    description: 'The QR Menu has been created successfully',
-    type: QRMenuResponseDto,
+    description: 'The QR Order has been successfully created.',
+    type: QROrderResponseDto,
     schema: {
       example: {
         id: 1,
-        merchant: { id: 5, name: 'Acme Corp' },
-        name: 'Star Menu QR',
-        description: 'This is the QR Menu of the Restaurant',
+        merchant: 1,
+        qrLocation: 1,
+        customer: 1,
+        table: 1,
+        order: 1,
+        notes: 'Special instructions for the order',
+        total_amount: 29.99,
+        qr_order_status: 'ACCEPTED',
         status: 'active',
-        design_theme: 'Texas Theme',
-        qr_type: 'DELIVERY',
       },
     },
   })
@@ -84,7 +87,7 @@ export class QrMenuController {
       example: {
         statusCode: 400,
         message: [
-          'merchant must be a number',
+          'QR Order must be a number',
           'status must be one of the following values: active, inactive',
         ],
         error: 'Bad Request',
@@ -121,8 +124,8 @@ export class QrMenuController {
       },
     },
   })
-  async create(@Body() dto: CreateQRMenuDto): Promise<OneQRMenuResponseDto> {
-    return this.qrMenuService.create(dto);
+  async create(@Body() dto: CreateQROrderDto): Promise<OneQROrderResponseDto> {
+    return this.qrOrderService.create(dto);
   }
   @Get()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -135,12 +138,12 @@ export class QrMenuController {
   )
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
-    summary: 'Get All QR Menu',
-    description: 'Endpoint for get ALL of the QR Menu.',
+    summary: 'Get a list of QR Orders',
+    description: 'Endpoint to retrieve a paginated list of QR Orders.',
   })
   @ApiOkResponse({
-    description: 'Paginated list of QR Menus',
-    type: PaginatedQRMenuResponseDto,
+    description: 'List of QR Orders retrieved successfully.',
+    type: PaginatedQROrderResponseDto,
   })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized. Authentication required',
@@ -153,7 +156,7 @@ export class QrMenuController {
     },
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden: Insufficient role or permissions',
+    description: 'Forbidden. Insufficient role.',
     schema: {
       example: {
         statusCode: 403,
@@ -173,10 +176,11 @@ export class QrMenuController {
     },
   })
   async findAll(
-    @Query() query: QueryQRMenuDto,
-  ): Promise<PaginatedQRMenuResponseDto> {
-    return this.qrMenuService.findAll(query);
+    @Query() query: QueryQROrderDto,
+  ): Promise<PaginatedQROrderResponseDto> {
+    return this.qrOrderService.findAll(query);
   }
+
   @Get(':id')
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
   @Scopes(
@@ -188,42 +192,44 @@ export class QrMenuController {
   )
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
-    summary: 'Get a QR Menu by ID',
-    description: 'Endpoint to retrieve a specific QR Menu using its ID.',
+    summary: 'Get a QR Order by ID',
+    description: 'Endpoint to retrieve a single QR Order by its ID.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'QR Menu ID',
+    description: 'ID of the QR Order to retrieve',
     example: 1,
   })
   @ApiOkResponse({
-    description: 'QR Menu retrieved successfully',
-    type: QRMenuResponseDto,
+    description: 'QR Order retrieved successfully.',
     schema: {
       example: {
         id: 1,
-        merchant: { id: 5, name: 'Acme Corp' },
-        name: 'Star Menu QR',
-        description: 'This is the QR Menu of the Restaurant',
+        merchant: 1,
+        qrLocation: 1,
+        customer: 1,
+        table: 1,
+        order: 1,
+        notes: 'Special instructions for the order',
+        total_amount: 29.99,
+        qr_order_status: 'ACCEPTED',
         status: 'active',
-        design_theme: 'Texas Theme',
-        qr_type: 'DELIVERY',
       },
     },
   })
   @ApiBadRequestResponse({
-    description: 'Bad Request: Invalid ID format',
+    description: 'Invalid ID parameter',
     schema: {
       example: {
         statusCode: 400,
-        message: 'Invalid ID. Must be a positive number.',
+        message: 'ID must be a number',
         error: 'Bad Request',
       },
     },
   })
   @ApiUnauthorizedResponse({
-    description: 'Unauthorized: Missing or invalid authentication token',
+    description: 'Unauthorized. Authentication required',
     schema: {
       example: {
         statusCode: 401,
@@ -233,7 +239,7 @@ export class QrMenuController {
     },
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden: Insufficient permissions',
+    description: 'Forbidden. Insufficient role.',
     schema: {
       example: {
         statusCode: 403,
@@ -243,11 +249,11 @@ export class QrMenuController {
     },
   })
   @ApiNotFoundResponse({
-    description: 'Not Found: QR Menu not found',
+    description: 'QR Order not found',
     schema: {
       example: {
         statusCode: 404,
-        message: 'QR Menu not found',
+        message: 'QR Order with ID 1 not found',
         error: 'Not Found',
       },
     },
@@ -264,12 +270,12 @@ export class QrMenuController {
   })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<OneQRMenuResponseDto> {
+  ): Promise<OneQROrderResponseDto> {
     if (id <= 0) {
-      throw new BadRequestException('Invalid ID. Must be a positive number.');
+      throw new BadRequestException('ID must be a positive integer');
     }
-    const qrMenu = await this.qrMenuService.findOne(id);
-    return qrMenu;
+    const qrOrder = await this.qrOrderService.findOne(id);
+    return qrOrder;
   }
 
   @Patch(':id')
@@ -283,41 +289,43 @@ export class QrMenuController {
   )
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
-    summary: 'Update a QR Menu',
-    description: 'Endpoint to update an existing QR Menu by its ID.',
+    summary: 'Update a QR Order',
+    description: 'Endpoint to update an existing QR Order.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'QR Menu ID',
+    description: 'ID of the QR Order to update',
     example: 1,
   })
   @ApiBody({
-    type: UpdateQRMenuDto,
-    description: 'Data for updating the QR Menu',
+    type: UpdateQROrderDto,
+    description: 'Data to update the QR Order',
   })
   @ApiOkResponse({
-    description: 'QR Menu updated successfully',
-    type: QRMenuResponseDto,
+    description: 'QR Order updated successfully.',
     schema: {
       example: {
         id: 1,
-        merchant: { id: 5, name: 'Acme Corp' },
-        name: 'Star Menu QR',
-        description: 'This is the QR Menu of the Restaurant',
-        status: 'inactive',
-        design_theme: 'Texas Theme',
-        qr_type: 'DELIVERY',
+        merchant: 1,
+        qrLocation: 1,
+        customer: 1,
+        table: 1,
+        order: 1,
+        notes: 'Updated instructions for the order',
+        total_amount: 39.99,
+        qr_order_status: 'COMPLETED',
+        status: 'active',
       },
     },
   })
   @ApiBadRequestResponse({
-    description: 'Bad Request: Invalid ID format or input data',
+    description: 'Invalid input data or ID parameter',
     schema: {
       example: {
         statusCode: 400,
         message: [
-          'Invalid ID. Must be a positive number.',
+          'ID must be a number',
           'status must be one of the following values: active, inactive',
         ],
         error: 'Bad Request',
@@ -325,17 +333,17 @@ export class QrMenuController {
     },
   })
   @ApiNotFoundResponse({
-    description: 'Not Found: QR Menu not found',
+    description: 'QR Order not found',
     schema: {
       example: {
         statusCode: 404,
-        message: 'QR Menu not found',
+        message: 'QR Order with ID 1 not found',
         error: 'Not Found',
       },
     },
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden: Insufficient role or permissions',
+    description: 'Forbidden. Insufficient role.',
     schema: {
       example: {
         statusCode: 403,
@@ -345,7 +353,7 @@ export class QrMenuController {
     },
   })
   @ApiUnauthorizedResponse({
-    description: 'Unauthorized: Missing or invalid authentication token',
+    description: 'Not authorized. Authentication required',
     schema: {
       example: {
         statusCode: 401,
@@ -366,9 +374,9 @@ export class QrMenuController {
   })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateQRMenuDto,
-  ): Promise<OneQRMenuResponseDto> {
-    return this.qrMenuService.update(id, dto);
+    @Body() dto: UpdateQROrderDto,
+  ): Promise<OneQROrderResponseDto> {
+    return this.qrOrderService.update(id, dto);
   }
   @Delete(':id')
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -381,52 +389,54 @@ export class QrMenuController {
   )
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
-    summary: 'Delete a QR Menu',
-    description: 'Endpoint to delete an existing QR Menu by its ID.',
+    summary: 'Delete a QR Order',
+    description: 'Endpoint to delete an existing QR Order.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'QR Menu ID',
+    description: 'ID of the QR Order to delete',
     example: 1,
   })
   @ApiOkResponse({
-    description: 'QR Menu retrieved successfully',
-    type: QRMenuResponseDto,
+    description: 'QR Order deleted successfully.',
     schema: {
       example: {
         id: 1,
-        merchant: { id: 5, name: 'Acme Corp' },
-        name: 'Star Menu QR',
-        description: 'This is the QR Menu of the Restaurant',
+        merchant: 1,
+        qrLocation: 1,
+        customer: 1,
+        table: 1,
+        order: 1,
+        notes: 'Special instructions for the order',
+        total_amount: 29.99,
+        qr_order_status: 'ACCEPTED',
         status: 'deleted',
-        design_theme: 'Texas Theme',
-        qr_type: 'DELIVERY',
       },
     },
   })
   @ApiBadRequestResponse({
-    description: 'Bad Request: Invalid ID format',
+    description: 'Invalid ID parameter',
     schema: {
       example: {
         statusCode: 400,
-        message: 'Invalid ID. Must be a positive number.',
+        message: 'ID must be a number',
         error: 'Bad Request',
       },
     },
   })
   @ApiNotFoundResponse({
-    description: 'Not Found: QR Menu not found',
+    description: 'QR Order not found',
     schema: {
       example: {
         statusCode: 404,
-        message: 'QR Menu not found',
+        message: 'QR Order with ID 1 not found',
         error: 'Not Found',
       },
     },
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden: Insufficient role or permissions',
+    description: 'Forbidden. Insufficient role.',
     schema: {
       example: {
         statusCode: 403,
@@ -436,7 +446,7 @@ export class QrMenuController {
     },
   })
   @ApiUnauthorizedResponse({
-    description: 'Unauthorized: Missing or invalid authentication token',
+    description: 'Not authorized. Authentication required',
     schema: {
       example: {
         statusCode: 401,
@@ -457,7 +467,7 @@ export class QrMenuController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-  ): Promise<OneQRMenuResponseDto> {
-    return this.qrMenuService.remove(id);
+  ): Promise<OneQROrderResponseDto> {
+    return this.qrOrderService.remove(id);
   }
 }

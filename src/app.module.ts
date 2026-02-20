@@ -95,6 +95,8 @@ import { QRMenuItem } from './qr-code/qr-menu-item/entity/qr-menu-item.entity';
 import { QRMenuItemModule } from './qr-code/qr-menu-item/qr-menu-item.module';
 import { QRLocation } from './qr-code/qr-location/entity/qr-location.entity';
 import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
+import { QrOrderModule } from './qr-code/qr-order/qr-order.module';
+import { QROrder } from './qr-code/qr-order/entity/qr-order.entity';
 
 @Module({
   imports: [
@@ -165,6 +167,7 @@ import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
           OnlineOrder,
           OnlineOrderItem,
           QRLocation,
+          QROrder,
         ],
         synchronize: true,
       }),
@@ -219,6 +222,7 @@ import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
     QRMenuSectionModule,
     QRMenuItemModule,
     QRLocationModule,
+    QrOrderModule,
   ],
 })
 export class AppModule {}
