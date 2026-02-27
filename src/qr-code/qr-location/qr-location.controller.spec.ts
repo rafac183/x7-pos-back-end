@@ -110,7 +110,7 @@ describe('QRLocationController', () => {
       expect(controller).toBeDefined();
     });
 
-    it('should have QrMenuItemService defined', () => {
+    it('should have QRLocationService defined', () => {
       expect(service).toBeDefined();
     });
   });

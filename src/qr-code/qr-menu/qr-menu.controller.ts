@@ -133,6 +133,7 @@ export class QrMenuController {
     Scope.MERCHANT_IOS,
     Scope.MERCHANT_CLOVER,
   )
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Get All QR Menu',
     description: 'Endpoint for get ALL of the QR Menu.',

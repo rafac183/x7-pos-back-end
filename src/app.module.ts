@@ -52,6 +52,7 @@ import { ApplicationEntity } from './subscriptions/applications/entity/applicati
 import { PlanApplication } from './subscriptions/plan-applications/entity/plan-applications.entity';
 import { CashTransactionsModule } from './cash-transactions/cash-transactions.module';
 import { ReceiptsModule } from './receipts/receipts.module';
+import { OrdersModule } from './orders/orders.module';
 import { SubscriptionApplication } from './subscriptions/subscription-application/entity/subscription-application.entity';
 import { Item } from './products-inventory/stocks/items/entities/item.entity';
 import { Movement } from './products-inventory/stocks/movements/entities/movement.entity';
@@ -62,6 +63,8 @@ import { OrderItemModule } from './order-item/order-item.module';
 import { OrderItem } from './order-item/entities/order-item.entity';
 import { KitchenStationModule } from './kitchen-display-system/kitchen-station/kitchen-station.module';
 import { KitchenStation } from './kitchen-display-system/kitchen-station/entities/kitchen-station.entity';
+import { KitchenDisplayDevice } from './kitchen-display-system/kitchen-display-device/entities/kitchen-display-device.entity';
+import { KitchenOrder } from './kitchen-display-system/kitchen-order/entities/kitchen-order.entity';
 import { OnlineStoresModule } from './online-ordering-system/online-stores/online-stores.module';
 import { OnlineStore } from './online-ordering-system/online-stores/entities/online-store.entity';
 import { PlanFeaturesModule } from './subscriptions/plan-features/plan-features.module';
@@ -89,7 +92,14 @@ import { OnlineOrderModule } from './online-ordering-system/online-order/online-
 import { OnlineOrder } from './online-ordering-system/online-order/entities/online-order.entity';
 import { OnlineOrderItemModule } from './online-ordering-system/online-order-item/online-order-item.module';
 import { OnlineOrderItem } from './online-ordering-system/online-order-item/entities/online-order-item.entity';
+import { OnlineDeliveryInfoModule } from './online-ordering-system/online-delivery-info/online-delivery-info.module';
+import { OnlineDeliveryInfo } from './online-ordering-system/online-delivery-info/entities/online-delivery-info.entity';
+import { OnlinePaymentModule } from './online-ordering-system/online-payment/online-payment.module';
+import { OnlinePayment } from './online-ordering-system/online-payment/entities/online-payment.entity';
+import { KitchenDisplayDeviceModule } from './kitchen-display-system/kitchen-display-device/kitchen-display-device.module';
+import { KitchenOrderModule } from './kitchen-display-system/kitchen-order/kitchen-order.module';
 import { QRMenuSection } from './qr-code/qr-menu-section/entity/qr-menu-section.entity';
+import { QrMenuSectionModule } from './qr-code/qr-menu-section/qr-menu-section.module';
 import { LoyaltyPointTransaction } from './loyalty/loyalty-points-transaction/entities/loyalty-points-transaction.entity';
 import { LoyaltyReward } from './loyalty/loyalty-reward/entities/loyalty-reward.entity';
 import { QRMenuSectionModule } from './qr-code/qr-menu-section/qr-menu-section.module';
@@ -97,6 +107,38 @@ import { QRMenuItem } from './qr-code/qr-menu-item/entity/qr-menu-item.entity';
 import { QRMenuItemModule } from './qr-code/qr-menu-item/qr-menu-item.module';
 import { QRLocation } from './qr-code/qr-location/entity/qr-location.entity';
 import { QRLocationModule } from './qr-code/qr-location/qr-location.module';
+import { QrOrderModule } from './qr-code/qr-order/qr-order.module';
+import { QROrder } from './qr-code/qr-order/entity/qr-order.entity';
+import { KitchenOrderItemModule } from './kitchen-display-system/kitchen-order-item/kitchen-order-item.module';
+import { KitchenOrderItem } from './kitchen-display-system/kitchen-order-item/entities/kitchen-order-item.entity';
+import { KitchenEventLogModule } from './kitchen-display-system/kitchen-event-log/kitchen-event-log.module';
+import { KitchenEventLog } from './kitchen-display-system/kitchen-event-log/entities/kitchen-event-log.entity';
+import { MarketingCampaignModule } from './marketing/marketing_campaing/marketing_campaing.module';
+import { MarketingCampaign } from './marketing/marketing_campaing/entities/marketing_campaing.entity';
+import { MarketingCampaingAudienceModule } from './marketing/marketing-campaing-audience/marketing-campaing-audience.module';
+import { MarketingCampaignAudience } from './marketing/marketing-campaing-audience/entities/marketing-campaing-audience.entity';
+import { MarketingSegmentsModule } from './marketing/marketing-segments/marketing-segments.module';
+import { MarketingSegment } from './marketing/marketing-segments/entities/marketing-segment.entity';
+import { MarketingSegmentRulesModule } from './marketing/marketing-segment-rules/marketing-segment-rules.module';
+import { MarketingSegmentRule } from './marketing/marketing-segment-rules/entities/marketing-segment-rule.entity';
+import { MarketingCouponsModule } from './marketing/marketing-coupons/marketing-coupons.module';
+import { MarketingCoupon } from './marketing/marketing-coupons/entities/marketing-coupon.entity';
+import { MarketingCouponRedemptionsModule } from './marketing/marketing-coupon-redemptions/marketing-coupon-redemptions.module';
+import { MarketingCouponRedemption } from './marketing/marketing-coupon-redemptions/entities/marketing-coupon-redemption.entity';
+import { MarketingAutomationsModule } from './marketing/marketing-automations/marketing-automations.module';
+import { MarketingAutomation } from './marketing/marketing-automations/entities/marketing-automation.entity';
+import { MarketingAutomationActionsModule } from './marketing/marketing-automation-actions/marketing-automation-actions.module';
+import { MarketingAutomationAction } from './marketing/marketing-automation-actions/entities/marketing-automation-action.entity';
+import { MarketingMessageLogsModule } from './marketing/marketing-message-logs/marketing-message-logs.module';
+import { MarketingMessageLog } from './marketing/marketing-message-logs/entities/marketing-message-log.entity';
+import { TipsModule } from './tips/tips/tips.module';
+import { Tip } from './tips/tips/entities/tip.entity';
+import { TipAllocationsModule } from './tips/tip-allocations/tip-allocations.module';
+import { TipAllocation } from './tips/tip-allocations/entities/tip-allocation.entity';
+import { TipPoolsModule } from './tips/tip-pools/tip-pools.module';
+import { TipPool } from './tips/tip-pools/entities/tip-pool.entity';
+import { TipPoolMembersModule } from './tips/tip-pool-members/tip-pool-members.module';
+import { TipPoolMember } from './tips/tip-pool-members/entities/tip-pool-member.entity';
 import { LoyaltyRewardsRedemtion } from './loyalty/loyalty-rewards-redemtions/entities/loyalty-rewards-redemtion.entity';
 import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon.entity';
 
@@ -156,6 +198,10 @@ import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon
           CashDrawerHistory,
           OrderItem,
           KitchenStation,
+          KitchenDisplayDevice,
+          KitchenOrder,
+          KitchenOrderItem,
+          KitchenEventLog,
           OnlineStore,
           QRMenu,
           QRMenuSection,
@@ -172,7 +218,23 @@ import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon
           OnlineMenuItem,
           OnlineOrder,
           OnlineOrderItem,
+          OnlineDeliveryInfo,
+          OnlinePayment,
           QRLocation,
+          QROrder,
+          MarketingCampaign,
+          MarketingCampaignAudience,
+          MarketingSegment,
+          MarketingSegmentRule,
+          MarketingCoupon,
+          MarketingCouponRedemption,
+          MarketingAutomation,
+          MarketingAutomationAction,
+          MarketingMessageLog,
+          Tip,
+          TipAllocation,
+          TipPool,
+          TipPoolMember,
         ],
         synchronize: true,
       }),
@@ -202,6 +264,7 @@ import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon
     PlanApplicationsModule,
     CashTransactionsModule,
     ReceiptsModule,
+    OrdersModule,
     PurchaseOrderModule,
     PurchaseOrderItemModule,
     FeaturesModule,
@@ -224,9 +287,33 @@ import { LoyaltyCoupon } from './loyalty/loyalty-coupons/entities/loyalty-coupon
     OnlineOrderModule,
 
     OnlineOrderItemModule,
+
+    OnlineDeliveryInfoModule,
+
+    OnlinePaymentModule,
+
+    KitchenDisplayDeviceModule,
+
+    KitchenOrderModule,
     QRMenuSectionModule,
     QRMenuItemModule,
     QRLocationModule,
+    QrOrderModule,
+    KitchenOrderItemModule,
+    KitchenEventLogModule,
+    MarketingCampaignModule,
+    MarketingCampaingAudienceModule,
+    MarketingSegmentsModule,
+    MarketingSegmentRulesModule,
+    MarketingCouponsModule,
+    MarketingCouponRedemptionsModule,
+    MarketingAutomationsModule,
+    MarketingAutomationActionsModule,
+    MarketingMessageLogsModule,
+    TipsModule,
+    TipAllocationsModule,
+    TipPoolsModule,
+    TipPoolMembersModule,
   ],
 })
 export class AppModule {}

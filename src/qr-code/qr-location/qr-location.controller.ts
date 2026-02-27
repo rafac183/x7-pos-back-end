@@ -139,6 +139,7 @@ export class QRLocationController {
     Scope.MERCHANT_IOS,
     Scope.MERCHANT_CLOVER,
   )
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiOperation({
     summary: 'Get All QR Location',
     description: 'Endpoint for get ALL of the QR Location.',

@@ -60,7 +60,9 @@ export enum ErrorMessage {
   QR_MENU_SECTION_NOT_FOUND = 'QR Menu Section not found',
   QR_MENU_ITEM_NOT_FOUND = 'QR Menu Item not found',
   QR_LOCATION_NOT_FOUND = 'QR Location not found',
+  QR_ORDER_NOT_FOUND = 'QR Order not found',
   TABLE_NOT_FOUND = 'Table not found',
+  ORDER_NOT_FOUND = 'Order not found',
 
   // 409 Conflict
   EMAIL_ALREADY_EXISTS = 'Email address is already registered',
