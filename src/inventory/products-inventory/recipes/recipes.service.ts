@@ -32,6 +32,22 @@ export class RecipesService {
     private readonly recipeTheoreticalCostService: RecipeTheoreticalCostService,
   ) {}
 
+  async findAllForMerchant(merchantId: number): Promise<ProductRecipe[]> {
+    return this.dataSource.manager.find(ProductRecipe, {
+      where: { merchantId },
+      relations: [
+        'finishedProduct',
+        'finishedVariant',
+        'lines',
+        'lines.rawMaterial',
+        'lines.supplyProduct',
+        'lines.supplyVariant',
+        'lines.modifier',
+      ],
+      order: { id: 'DESC' },
+    });
+  }
+
   async findAllForProduct(
     merchantId: number,
     productId: number,
@@ -43,6 +59,7 @@ export class RecipesService {
       order: { id: 'ASC' },
     });
   }
+
 
   async create(
     merchantId: number,

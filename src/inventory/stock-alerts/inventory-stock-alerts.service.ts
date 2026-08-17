@@ -20,6 +20,7 @@ export class InventoryStockAlertsService {
       stockItemId: row.stockItemId,
       productId: row.productId,
       variantId: row.variantId,
+      supplyId: row.supplyId,
       locationId: row.locationId,
       categoryId: row.categoryId,
       alertType: row.alertType,
@@ -29,7 +30,7 @@ export class InventoryStockAlertsService {
       triggeredAt: row.triggeredAt,
       resolvedAt: row.resolvedAt,
       emailSentAt: row.emailSentAt,
-      productName: row.product?.name ?? null,
+      productName: row.product?.name ?? row.supply?.name ?? null,
       variantName: row.variant?.name ?? null,
       locationName: row.location?.name ?? null,
       categoryName: row.product?.category?.name ?? null,
@@ -59,6 +60,7 @@ export class InventoryStockAlertsService {
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('alert.variant', 'variant')
       .leftJoinAndSelect('alert.location', 'location')
+      .leftJoinAndSelect('alert.supply', 'supply')
       .where('alert.merchantId = :merchantId', { merchantId })
       .andWhere('alert.status = :status', { status });
 
@@ -96,7 +98,7 @@ export class InventoryStockAlertsService {
   ): Promise<InventoryStockAlertResponseDto> {
     const row = await this.alertRepo.findOne({
       where: { id: alertId, merchantId },
-      relations: ['product', 'product.category', 'variant', 'location'],
+      relations: ['product', 'product.category', 'variant', 'location', 'supply'],
     });
     if (!row) {
       throw new NotFoundException('Inventory stock alert not found');

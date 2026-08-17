@@ -15,6 +15,8 @@ import { Location } from 'src/inventory/products-inventory/stocks/locations/enti
 import { InventoryStockAlertType } from '../constants/inventory-stock-alert-type.enum';
 import { InventoryStockAlertStatus } from '../constants/inventory-stock-alert-status.enum';
 
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+
 @Entity({ name: 'inventory_stock_alert' })
 @Index(['merchantId', 'status'])
 @Index(['categoryId'])
@@ -37,19 +39,26 @@ export class InventoryStockAlert {
   @JoinColumn({ name: 'stockItemId' })
   stockItem: Item;
 
-  @Column({ type: 'int' })
-  productId: number;
+  @Column({ type: 'int', nullable: true })
+  productId: number | null;
 
-  @ManyToOne(() => Product, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Product, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'productId' })
-  product: Product;
+  product: Product | null;
 
-  @Column({ type: 'int' })
-  variantId: number;
+  @Column({ type: 'int', nullable: true })
+  variantId: number | null;
 
-  @ManyToOne(() => Variant, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Variant, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'variantId' })
-  variant: Variant;
+  variant: Variant | null;
+
+  @Column({ type: 'int', nullable: true })
+  supplyId: number | null;
+
+  @ManyToOne(() => Supply, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'supplyId' })
+  supply: Supply | null;
 
   @Column({ type: 'int' })
   locationId: number;
