@@ -9,7 +9,12 @@ import {
   IsIn,
   IsOptional,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  TABLE_SHAPES,
+  TABLE_MIN_SIZE_PX,
+  TABLE_MAX_SIZE_PX,
+} from '../../constants/table-shape.constants';
 
 export class CreateTableDto {
   @ApiProperty({ example: 1, description: 'Merchant ID' })
@@ -56,8 +61,30 @@ export class CreateTableDto {
   })
   @IsString()
   @IsNotEmpty()
-  @IsIn(['Circle', 'Square', 'Rectangle'])
+  @IsIn([...TABLE_SHAPES])
   shape: string;
+
+  // Tamaño propio en píxeles de lienzo. Opcional: omitirlo mantiene el tamaño por
+  // defecto de la forma, que es como se comportaban las mesas antes.
+  @ApiPropertyOptional({
+    example: 120,
+    description: 'Custom table width in canvas pixels; omit for the shape default',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(TABLE_MIN_SIZE_PX)
+  @Max(TABLE_MAX_SIZE_PX)
+  width?: number | null;
+
+  @ApiPropertyOptional({
+    example: 70,
+    description: 'Custom table height in canvas pixels; omit for the shape default',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(TABLE_MIN_SIZE_PX)
+  @Max(TABLE_MAX_SIZE_PX)
+  height?: number | null;
 
   @ApiProperty({
     example: 100,

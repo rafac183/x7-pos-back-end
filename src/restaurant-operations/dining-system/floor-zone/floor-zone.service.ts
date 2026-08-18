@@ -53,6 +53,7 @@ export class FloorZoneService {
     const floorZone = this.floorZoneRepository.create({
       name: dto.name,
       color: dto.color,
+      area: dto.area ?? null,
       status: dto.status,
       merchant: merchant,
       floorPlan: floorPlan,
@@ -97,7 +98,7 @@ export class FloorZoneService {
       qb.andWhere('floorZone.status = :status', { status });
     } else {
       qb.andWhere('floorZone.status IN (:...statuses)', {
-        statuses: ['active', 'inactive'],
+        statuses: ['active', 'inactive', 'draft', 'archived'],
       });
     }
 
@@ -129,7 +130,8 @@ export class FloorZoneService {
     }
 
     const floorZone = await this.floorZoneRepository.findOne({
-      where: { id, status: In(['active', 'inactive']) },
+      // Incluye la tríada de la UI: una zona en draft/archived también debe poder editarse.
+      where: { id, status: In(['active', 'inactive', 'draft', 'archived']) },
       relations: ['merchant', 'floorPlan'],
     });
     if (!floorZone) {

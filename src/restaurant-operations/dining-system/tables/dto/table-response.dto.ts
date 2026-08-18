@@ -63,6 +63,20 @@ export class TableResponseDto {
   shape: string;
 
   @ApiProperty({
+    example: 120,
+    nullable: true,
+    description: 'Custom table width in canvas pixels; null = shape default',
+  })
+  width: number | null;
+
+  @ApiProperty({
+    example: 70,
+    nullable: true,
+    description: 'Custom table height in canvas pixels; null = shape default',
+  })
+  height: number | null;
+
+  @ApiProperty({
     example: 100,
     description: 'X coordinate for the table position on the floor plan',
   })
