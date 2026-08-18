@@ -7,8 +7,9 @@ export type InventoryStockAlertPayload = {
   companyId: number;
   merchantId: number;
   stockItemId: number;
-  productId: number;
-  variantId: number;
+  productId: number | null;
+  variantId: number | null;
+  supplyId?: number | null;
   locationId: number;
   categoryId: number | null;
   alertType: InventoryStockAlertType;

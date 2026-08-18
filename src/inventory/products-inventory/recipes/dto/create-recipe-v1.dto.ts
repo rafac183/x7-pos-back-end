@@ -27,6 +27,16 @@ export class RecipeLineV1Dto {
   @IsString()
   @IsNotEmpty()
   unit_of_measure: string;
+
+  @ApiPropertyOptional({ example: 150.5, description: 'Quantity per sold unit (optional)' })
+  @IsOptional()
+  @IsNumber()
+  quantity_per_sold_unit?: number;
+
+  @ApiPropertyOptional({ example: 1.25, description: 'Cost contribution (optional)' })
+  @IsOptional()
+  @IsNumber()
+  cost_contribution?: number;
 }
 
 export class CreateRecipeV1Dto {
@@ -40,6 +50,26 @@ export class CreateRecipeV1Dto {
   @IsInt()
   @Min(1)
   variantId?: number;
+
+  @ApiPropertyOptional({ example: 'Classic Burger Recipe', description: 'Recipe formula name (optional)' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Yield quantity / portions (optional)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.0001)
+  yieldQuantity?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Active status (optional)' })
+  @IsOptional()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ example: 5.50, description: 'Total theoretical cost (optional)' })
+  @IsOptional()
+  @IsNumber()
+  totalTheoreticalCost?: number;
 
   @ApiProperty({ type: [RecipeLineV1Dto], description: 'Recipe ingredient lines' })
   @IsArray()
