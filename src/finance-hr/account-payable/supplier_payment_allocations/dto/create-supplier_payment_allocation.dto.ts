@@ -11,16 +11,19 @@ import {
 import { Type } from 'class-transformer';
 
 export class CreateSupplierPaymentAllocationDto {
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  @IsPositive()
-  payment_id: number;
-
-  @ApiPropertyOptional({ example: 4 })
+  // Mutually exclusive with credit_note_id: exactly one funding source must be set.
+  // The XOR itself lives in the service so it also covers partial updates.
+  @ApiPropertyOptional({ example: 1, nullable: true })
   @IsOptional()
   @IsInt()
   @IsPositive()
-  credit_note_id?: number;
+  payment_id?: number | null;
+
+  @ApiPropertyOptional({ example: 4, nullable: true })
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  credit_note_id?: number | null;
 
   @ApiProperty({ example: 5 })
   @IsInt()

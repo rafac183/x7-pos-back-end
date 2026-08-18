@@ -16,9 +16,11 @@ export class SupplierPaymentAllocation {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ApiProperty({ example: 1 })
-  @Column({ type: 'int', name: 'payment_id' })
-  payment_id: number;
+  // Nullable: an allocation is funded by EITHER a payment OR a credit note (XOR),
+  // so a credit-note application carries no payment_id at all.
+  @ApiProperty({ example: 1, nullable: true })
+  @Column({ type: 'int', name: 'payment_id', nullable: true })
+  payment_id: number | null;
 
   @ApiProperty({ example: 4, nullable: true })
   @Column({ type: 'int', name: 'credit_note_id', nullable: true })
@@ -54,9 +56,10 @@ export class SupplierPaymentAllocation {
 
   @ManyToOne(() => SupplierPayment, (payment) => payment.allocations, {
     onDelete: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'payment_id' })
-  payment: SupplierPayment;
+  payment?: SupplierPayment | null;
 
   @ManyToOne(() => SupplierCreditNote, (creditNote) => creditNote.allocations, {
     nullable: true,

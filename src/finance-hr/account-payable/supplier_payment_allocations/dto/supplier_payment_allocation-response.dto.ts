@@ -5,8 +5,8 @@ export class SupplierPaymentAllocationResponseDto {
   @ApiProperty({ example: 1 })
   id: number;
 
-  @ApiProperty({ example: 1 })
-  payment_id: number;
+  @ApiProperty({ example: 1, nullable: true })
+  payment_id: number | null;
 
   @ApiProperty({ example: 4, nullable: true })
   credit_note_id: number | null;
