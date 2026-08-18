@@ -2,6 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import { SuccessResponse } from '../../../../common/dtos/success-response.dto';
 import { CashTransactionStatus } from '../constants/cash-transaction-status.enum';
 import { CashTransactionType } from '../constants/cash-transaction-type.enum';
+import { CashShiftStatus } from 'src/restaurant-operations/cashdrawer/cash-shifts/constants/cash-shift-status.enum';
+import { BasicCollaboratorInfoDto } from 'src/restaurant-operations/cashdrawer/cash-shifts/dto/cash-shift-response.dto';
+import { LoyaltyPointsSource } from 'src/growth/loyalty/loyalty-points-transaction/constants/loyalty-points-source.enum';
 
 export class CashTransactionResponseDto {
   @ApiProperty({ example: 1 })
@@ -73,4 +76,63 @@ export class CashTransactionLittleResponseDto {
 
   @ApiProperty({ example: 125.5 })
   amount: number;
+}
+
+export class CashTransactionCashShiftDto {
+  @ApiProperty({ example: 7 })
+  id: number;
+
+  @ApiProperty({ example: 'OPEN', enum: CashShiftStatus })
+  status: CashShiftStatus;
+
+  @ApiProperty({ example: '2024-01-15T07:00:00Z' })
+  openedAt: Date;
+
+  @ApiProperty({ example: '2024-01-15T20:00:00Z', nullable: true })
+  closedAt: Date | null;
+
+  @ApiProperty({ example: 1000.0 })
+  openingBalance: number;
+
+  @ApiProperty({ type: () => BasicCollaboratorInfoDto })
+  openedByCollaborator: BasicCollaboratorInfoDto;
+
+  @ApiProperty({ type: () => BasicCollaboratorInfoDto, nullable: true })
+  closedByCollaborator: BasicCollaboratorInfoDto | null;
+}
+
+export class CashTransactionLoyaltyPointDto {
+  @ApiProperty({ example: 55 })
+  id: number;
+
+  @ApiProperty({ example: 'Points earned from order', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ example: 'ORDER', enum: LoyaltyPointsSource })
+  source: LoyaltyPointsSource;
+
+  @ApiProperty({ example: 150 })
+  points: number;
+
+  @ApiProperty({ example: 3 })
+  loyaltyCustomerId: number;
+
+  @ApiProperty({ example: '2024-01-15T08:00:00Z' })
+  createdAt: Date;
+}
+
+export class CashTransactionDetailResponseDto extends CashTransactionResponseDto {
+  @ApiProperty({ type: () => BasicCollaboratorInfoDto })
+  collaborator: BasicCollaboratorInfoDto;
+
+  @ApiProperty({ type: () => CashTransactionCashShiftDto, nullable: true })
+  cashShift: CashTransactionCashShiftDto | null;
+
+  @ApiProperty({ type: () => CashTransactionLoyaltyPointDto, isArray: true })
+  loyaltyPointTransactions: CashTransactionLoyaltyPointDto[];
+}
+
+export class OneCashTransactionDetailResponseDto extends SuccessResponse {
+  @ApiProperty({ type: CashTransactionDetailResponseDto })
+  data: CashTransactionDetailResponseDto;
 }

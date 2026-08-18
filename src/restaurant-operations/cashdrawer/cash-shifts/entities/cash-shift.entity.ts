@@ -10,6 +10,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Merchant } from '../../../../platform-saas/merchants/entities/merchant.entity';
 import { CashDrawer } from '../../cash-drawers/entities/cash-drawer.entity';
+import { Collaborator } from '../../../../finance-hr/hr/collaborators/entities/collaborator.entity';
 import { CashShiftStatus } from '../constants/cash-shift-status.enum';
 import type { CashTransaction } from '../../cash-transactions/entities/cash-transaction.entity';
 import type { CashMovement } from '../../cash-movements/entities/cash-movement.entity';
@@ -81,6 +82,14 @@ export class CashShift {
     @ManyToOne(() => CashDrawer, { nullable: false })
     @JoinColumn({ name: 'cash_drawer_id' })
     cashDrawer: CashDrawer;
+
+    @ManyToOne(() => Collaborator, { nullable: false })
+    @JoinColumn({ name: 'opened_by' })
+    openedByCollaborator: Collaborator;
+
+    @ManyToOne(() => Collaborator, { nullable: true })
+    @JoinColumn({ name: 'closed_by' })
+    closedByCollaborator: Collaborator | null;
 
     @OneToMany('CashTransaction', (ct: CashTransaction) => ct.cashShift)
     cashTransactions: CashTransaction[];

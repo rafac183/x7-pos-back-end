@@ -4,14 +4,16 @@ import { IsIn, IsOptional, IsString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class QueryFloorPlanDto {
+  // 'active' | 'draft' | 'archived' es el vocabulario del backoffice; 'inactive' y 'deleted'
+  // se mantienen porque otros clientes (POS, portal) siguen filtrando por ellos.
   @ApiPropertyOptional({
     description: 'Filter by status',
-    enum: ['active', 'inactive', 'deleted'],
+    enum: ['active', 'inactive', 'draft', 'archived', 'deleted'],
     example: 'active',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['active', 'inactive', 'deleted'])
+  @IsIn(['active', 'inactive', 'draft', 'archived', 'deleted'])
   status?: string;
 
   @ApiPropertyOptional({

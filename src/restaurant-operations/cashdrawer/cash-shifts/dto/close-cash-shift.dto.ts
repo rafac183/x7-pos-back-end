@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsPositive, IsInt, Min } from 'class-validator';
+import { IsNumber, Min } from 'class-validator';
 
 export class CloseCashShiftDto {
   @ApiProperty({
@@ -9,12 +9,4 @@ export class CloseCashShiftDto {
   @IsNumber()
   @Min(0)
   declaredAmount: number;
-
-  @ApiProperty({
-    example: 5,
-    description: 'ID of the collaborator closing the shift',
-  })
-  @IsInt()
-  @IsPositive()
-  collaboratorId: number;
 }

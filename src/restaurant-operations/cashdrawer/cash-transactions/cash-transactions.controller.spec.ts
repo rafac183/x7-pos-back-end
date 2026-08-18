@@ -9,7 +9,9 @@ import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto';
 import { GetCashTransactionsQueryDto } from './dto/get-cash-transactions-query.dto';
 import {
   OneCashTransactionResponseDto,
+  OneCashTransactionDetailResponseDto,
   CashTransactionResponseDto,
+  CashTransactionDetailResponseDto,
 } from './dto/cash-transaction-response.dto';
 import { PaginatedCashTransactionsResponseDto } from './dto/cash-transaction-response.dto';
 import { CashTransactionType } from './constants/cash-transaction-type.enum';
@@ -64,6 +66,21 @@ describe('CashTransactionsController', () => {
     message: 'Cash transaction created successfully',
     data: mockCashTransactionResponseData,
   };
+
+  const mockCashTransactionDetailResponseData: CashTransactionDetailResponseDto =
+    {
+      ...mockCashTransactionResponseData,
+      collaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+      cashShift: null,
+      loyaltyPointTransactions: [],
+    };
+
+  const mockOneCashTransactionDetailResponse: OneCashTransactionDetailResponseDto =
+    {
+      statusCode: 200,
+      message: 'Cash transaction retrieved successfully',
+      data: mockCashTransactionDetailResponseData,
+    };
 
   const mockPaginatedResponse: PaginatedCashTransactionsResponseDto = {
     statusCode: 200,
@@ -229,8 +246,8 @@ describe('CashTransactionsController', () => {
   describe('GET /cash-transactions/:id (findOne)', () => {
     it('should return a single cash transaction by ID', async () => {
       const findOneSpy = jest.spyOn(service, 'findOne');
-      const response: OneCashTransactionResponseDto = {
-        ...mockOneCashTransactionResponse,
+      const response: OneCashTransactionDetailResponseDto = {
+        ...mockOneCashTransactionDetailResponse,
         statusCode: 200,
         message: 'Cash transaction retrieved successfully',
       };
@@ -257,8 +274,8 @@ describe('CashTransactionsController', () => {
 
     it('should parse id parameter correctly', async () => {
       const findOneSpy = jest.spyOn(service, 'findOne');
-      const response: OneCashTransactionResponseDto = {
-        ...mockOneCashTransactionResponse,
+      const response: OneCashTransactionDetailResponseDto = {
+        ...mockOneCashTransactionDetailResponse,
         statusCode: 200,
         message: 'Cash transaction retrieved successfully',
       };

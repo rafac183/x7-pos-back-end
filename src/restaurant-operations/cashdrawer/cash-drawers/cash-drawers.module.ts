@@ -7,10 +7,12 @@ import { CashDrawersController } from './cash-drawers.controller';
 import { CashDrawer } from './entities/cash-drawer.entity';
 import { Shift } from '../../shift/shifts/entities/shift.entity';
 import { Collaborator } from 'src/finance-hr/hr/collaborators/entities/collaborator.entity';
+import { CashDrawerHistoryModule } from '../cash-drawer-history/cash-drawer-history.module';
 
 @Module({
   imports: [
     AuthModule,
+    CashDrawerHistoryModule,
     TypeOrmModule.forFeature([CashDrawer, Shift, Collaborator]),
   ],
   controllers: [CashDrawersController],
@@ -18,3 +20,4 @@ import { Collaborator } from 'src/finance-hr/hr/collaborators/entities/collabora
   exports: [CashDrawersService],
 })
 export class CashDrawersModule {}
+

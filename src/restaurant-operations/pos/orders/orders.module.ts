@@ -60,4 +60,4 @@ import { LoyaltyPointTransaction } from 'src/growth/loyalty/loyalty-points-trans
   providers: [OrdersService],
   exports: [OrdersService],
 })
-export class OrdersModule {}
+export class OrdersModule { }

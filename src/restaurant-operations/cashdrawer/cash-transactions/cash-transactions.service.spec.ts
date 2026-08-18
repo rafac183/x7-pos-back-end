@@ -637,10 +637,196 @@ describe('CashTransactionsService', () => {
 
       expect(cashTransactionRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1, status: CashTransactionStatus.ACTIVE },
+        relations: [
+          'collaborator',
+          'cashShift',
+          'cashShift.openedByCollaborator',
+          'cashShift.closedByCollaborator',
+          'loyaltyPointTransactions',
+        ],
       });
       expect(result.statusCode).toBe(200);
       expect(result.message).toBe('Cash transaction retrieved successfully');
       expect(result.data.id).toBe(1);
+    });
+
+    it('should map collaborator, cashShift, and loyaltyPointTransactions onto the detail response', async () => {
+      const fullTransaction = {
+        ...mockCashTransaction,
+        collaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+        cashShift: {
+          id: 7,
+          status: 'OPEN',
+          openedAt: new Date('2024-01-15T07:00:00Z'),
+          closedAt: null,
+          openingBalance: 100,
+          systemAmount: null,
+          declaredAmount: null,
+          difference: null,
+          openedBy: 1,
+          closedBy: null,
+          openedByCollaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+          closedByCollaborator: null,
+        },
+        loyaltyPointTransactions: [
+          {
+            id: 55,
+            description: 'Points earned from order',
+            source: 'ORDER',
+            points: 150,
+            loyaltyCustomerId: 3,
+            createdAt: new Date('2024-01-15T08:00:00Z'),
+            is_active: true,
+          },
+        ],
+      };
+      jest
+        .spyOn(cashTransactionRepository, 'findOne')
+        .mockResolvedValue(fullTransaction as any);
+      jest
+        .spyOn(cashDrawerRepository, 'findOne')
+        .mockResolvedValue(mockCashDrawer as any);
+
+      const result = await service.findOne(1, 1);
+
+      expect(result.data.collaborator).toEqual({
+        id: 1,
+        name: 'Jhon Doe',
+        role: 'waiter',
+      });
+      expect(result.data.cashShift).toEqual({
+        id: 7,
+        status: 'OPEN',
+        openedAt: fullTransaction.cashShift.openedAt,
+        closedAt: null,
+        openingBalance: 100,
+        openedByCollaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+        closedByCollaborator: null,
+      });
+      expect(result.data.loyaltyPointTransactions).toEqual([
+        {
+          id: 55,
+          description: 'Points earned from order',
+          source: 'ORDER',
+          points: 150,
+          loyaltyCustomerId: 3,
+          createdAt: fullTransaction.loyaltyPointTransactions[0].createdAt,
+        },
+      ]);
+    });
+
+    it('should return cashShift: null and loyaltyPointTransactions: [] when neither relation is present', async () => {
+      const bareTransaction = {
+        ...mockCashTransaction,
+        collaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+        cashShift: null,
+        loyaltyPointTransactions: [],
+      };
+      jest
+        .spyOn(cashTransactionRepository, 'findOne')
+        .mockResolvedValue(bareTransaction as any);
+      jest
+        .spyOn(cashDrawerRepository, 'findOne')
+        .mockResolvedValue(mockCashDrawer as any);
+
+      const result = await service.findOne(1, 1);
+
+      expect(result.data.cashShift).toBeNull();
+      expect(result.data.loyaltyPointTransactions).toEqual([]);
+    });
+
+    it('should fall back to an Unknown collaborator when the relation is missing', async () => {
+      const noCollaboratorTransaction = {
+        ...mockCashTransaction,
+        collaborator: null,
+        cashShift: null,
+        loyaltyPointTransactions: [],
+      };
+      jest
+        .spyOn(cashTransactionRepository, 'findOne')
+        .mockResolvedValue(noCollaboratorTransaction as any);
+      jest
+        .spyOn(cashDrawerRepository, 'findOne')
+        .mockResolvedValue(mockCashDrawer as any);
+
+      const result = await service.findOne(1, 1);
+
+      expect(result.data.collaborator).toEqual({
+        id: mockCashTransaction.collaborator_id,
+        name: 'Unknown',
+        role: '—',
+      });
+    });
+
+    it('should handle wire-format bigint/decimal fields, filter inactive loyalty rows, and populate closedByCollaborator', async () => {
+      // Fixture matching actual Postgres driver wire format: bigint/decimal as strings
+      const closedShiftTransaction = {
+        ...mockCashTransaction,
+        collaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+        cashShift: {
+          id: 7,
+          status: 'CLOSED',
+          openedAt: new Date('2024-01-15T07:00:00Z'),
+          closedAt: new Date('2024-01-15T20:00:00Z'),
+          openingBalance: '1000.00', // String, as Postgres driver returns decimals
+          systemAmount: null,
+          declaredAmount: null,
+          difference: null,
+          openedBy: 1,
+          closedBy: 2,
+          openedByCollaborator: { id: 1, name: 'Jhon Doe', role: 'waiter' },
+          closedByCollaborator: { id: 2, name: 'Jane Smith', role: 'manager' },
+        },
+        loyaltyPointTransactions: [
+          {
+            id: '55', // String, as Postgres driver returns bigint
+            description: 'Points earned from order',
+            source: 'ORDER',
+            points: 150,
+            loyaltyCustomerId: '3', // String, as Postgres driver returns bigint
+            createdAt: new Date('2024-01-15T08:00:00Z'),
+            is_active: true,
+          },
+          {
+            id: '56', // String bigint
+            description: 'Points reversed from refund',
+            source: 'ORDER_REVERSAL',
+            points: -150,
+            loyaltyCustomerId: '3', // String bigint
+            createdAt: new Date('2024-01-15T08:30:00Z'),
+            is_active: false, // Should be filtered out
+          },
+        ],
+      };
+      jest
+        .spyOn(cashTransactionRepository, 'findOne')
+        .mockResolvedValue(closedShiftTransaction as any);
+      jest
+        .spyOn(cashDrawerRepository, 'findOne')
+        .mockResolvedValue(mockCashDrawer as any);
+
+      const result = await service.findOne(1, 1);
+
+      // Verify bigint coercion on loyalty points
+      expect(result.data.loyaltyPointTransactions).toHaveLength(1);
+      expect(result.data.loyaltyPointTransactions[0].id).toBe(55);
+      expect(typeof result.data.loyaltyPointTransactions[0].id).toBe('number');
+      expect(result.data.loyaltyPointTransactions[0].loyaltyCustomerId).toBe(3);
+      expect(typeof result.data.loyaltyPointTransactions[0].loyaltyCustomerId).toBe('number');
+
+      // Verify is_active filter (inactive row should be excluded)
+      expect(result.data.loyaltyPointTransactions.some((lpt) => lpt.points === -150)).toBe(false);
+
+      // Verify decimal coercion on cashShift.openingBalance
+      expect(result.data.cashShift?.openingBalance).toBe(1000.0);
+      expect(typeof result.data.cashShift?.openingBalance).toBe('number');
+
+      // Verify closedByCollaborator is properly populated
+      expect(result.data.cashShift?.closedByCollaborator).toEqual({
+        id: 2,
+        name: 'Jane Smith',
+        role: 'manager',
+      });
     });
 
     it('should throw BadRequestException if id is invalid', async () => {

@@ -15,6 +15,8 @@ import {
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interface';
 
 import {
   ApiTags,
@@ -35,7 +37,7 @@ import {
 } from '@nestjs/swagger';
 import { CashDrawersService } from './cash-drawers.service';
 import { CreateCashDrawerDto } from './dto/create-cash-drawer.dto';
-import { UpdateCashDrawerDto } from './dto/update-cash-drawer.dto';
+import { CloseCashDrawerDto } from './dto/close-cash-drawer.dto';
 import { GetCashDrawersQueryDto } from './dto/get-cash-drawers-query.dto';
 import {
   CashDrawerResponseDto,
@@ -76,7 +78,7 @@ export class CashDrawersController {
   @ApiOperation({
     summary: 'Create a new cash drawer',
     description:
-      'Creates a new cash drawer for a specific shift. Only merchant administrators and users can create cash drawers for their merchant.',
+      "Opens a new cash drawer for the authenticated user's active shift. The shift and operator are resolved automatically from the authenticated session, not supplied by the client. Only merchant administrators and users can create cash drawers for their merchant.",
   })
   @ApiCreatedResponse({
     description: 'Cash drawer created successfully',
@@ -117,11 +119,11 @@ export class CashDrawersController {
     },
   })
   @ApiBadRequestResponse({
-    description: 'Invalid input data',
+    description:
+      'Invalid input data, no active shift, or no linked collaborator profile',
     example: {
       statusCode: 400,
-      message: 'Validation failed',
-      error: 'Bad Request',
+      message: 'No active shift found. Start a shift before opening a cash drawer.',
     },
   })
   @ApiUnauthorizedResponse({
@@ -132,37 +134,26 @@ export class CashDrawersController {
     },
   })
   @ApiForbiddenResponse({
-    description: 'Forbidden - Insufficient permissions or merchant mismatch',
+    description: 'Forbidden - user is not associated with a merchant',
     example: {
       statusCode: 403,
-      message:
-        'You can only create cash drawers for shifts belonging to your merchant',
-    },
-  })
-  @ApiNotFoundResponse({
-    description: 'Resource not found',
-    example: {
-      statusCode: 404,
-      message: 'Shift not found',
+      message: 'You must be associated with a merchant to create cash drawers',
     },
   })
   @ApiConflictResponse({
-    description: 'Conflict - Business rule violation',
+    description: 'Conflict - the active shift already has an open cash drawer',
     example: {
       statusCode: 409,
-      message: 'There is already an open cash drawer for this shift',
+      message:
+        'An active cash drawer session (#CD-12) is already open for this shift. Please close the active session before opening a new drawer.',
     },
   })
   @ApiBody({ type: CreateCashDrawerDto })
   async create(
     @Body() createCashDrawerDto: CreateCashDrawerDto,
-    @Request() req,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const authenticatedUserMerchantId = req.user?.merchant?.id;
-    return this.cashDrawersService.create(
-      createCashDrawerDto,
-      authenticatedUserMerchantId,
-    );
+    return this.cashDrawersService.create(createCashDrawerDto, user);
   }
 
   @Get()
@@ -273,7 +264,7 @@ export class CashDrawersController {
     name: 'status',
     required: false,
     enum: CashDrawerStatus,
-    description: 'Filter by cash drawer status (Open, Close, Pause)',
+    description: 'Filter by cash drawer status (Open, Close, Pause, Discrepancy)',
   })
   @ApiQuery({
     name: 'createdDate',
@@ -462,7 +453,8 @@ export class CashDrawersController {
     },
   })
   @ApiBadRequestResponse({
-    description: 'Invalid input data or cash drawer ID',
+    description:
+      'Invalid input data, cash drawer ID, or no linked collaborator profile',
     example: {
       statusCode: 400,
       message: 'Cash drawer ID must be a valid positive number',
@@ -483,32 +475,27 @@ export class CashDrawersController {
     },
   })
   @ApiNotFoundResponse({
-    description: 'Cash drawer or related resource not found',
+    description: 'Cash drawer not found',
     example: {
       statusCode: 404,
       message: 'Cash drawer not found',
     },
   })
   @ApiConflictResponse({
-    description: 'Conflict - Business rule violation',
+    description: 'Conflict - the cash drawer is not currently open',
     example: {
       statusCode: 409,
-      message: 'Validation failed',
+      message: 'Only an open cash drawer can be closed',
     },
   })
   @ApiParam({ name: 'id', type: Number, description: 'Cash drawer ID' })
-  @ApiBody({ type: UpdateCashDrawerDto })
+  @ApiBody({ type: CloseCashDrawerDto })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateCashDrawerDto: UpdateCashDrawerDto,
-    @Request() req,
+    @Body() closeCashDrawerDto: CloseCashDrawerDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    const authenticatedUserMerchantId = req.user?.merchant?.id;
-    return this.cashDrawersService.update(
-      id,
-      updateCashDrawerDto,
-      authenticatedUserMerchantId,
-    );
+    return this.cashDrawersService.update(id, closeCashDrawerDto, user);
   }
 
   @Delete(':id')

@@ -69,10 +69,30 @@ export class Table {
 
   @ApiProperty({
     example: 'Circle',
-    description: 'Shape of the table (e.g., Circle, Square, Rectangle)',
+    description:
+      'Shape of the table (Circle, Square, Rectangle, Oval, Booth, Counter)',
   })
   @Column({ type: 'varchar', length: 50, nullable: true })
   shape: string;
+
+  // Tamaño propio de la mesa en píxeles de lienzo (100px = 1m). Nullable a propósito:
+  // null significa "usa el tamaño por defecto de su forma", que es como se comportaban
+  // todas las mesas antes de existir estas columnas.
+  @ApiProperty({
+    example: 120,
+    nullable: true,
+    description: 'Custom table width in canvas pixels; null = shape default',
+  })
+  @Column({ type: 'int', nullable: true })
+  width: number | null;
+
+  @ApiProperty({
+    example: 70,
+    nullable: true,
+    description: 'Custom table height in canvas pixels; null = shape default',
+  })
+  @Column({ type: 'int', nullable: true })
+  height: number | null;
 
   @ApiProperty({
     example: 100,

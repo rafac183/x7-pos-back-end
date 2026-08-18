@@ -17,12 +17,4 @@ export class CreateCashShiftDto {
   @IsNumber()
   @Min(0)
   openingBalance: number;
-
-  @ApiProperty({
-    example: 5,
-    description: 'ID of the collaborator opening the shift',
-  })
-  @IsInt()
-  @IsPositive()
-  collaboratorId: number;
 }

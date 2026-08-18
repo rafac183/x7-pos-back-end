@@ -7,13 +7,13 @@ import {
   Delete,
   UseGuards,
   Query,
-  Request,
   ParseIntPipe,
   Put,
 } from '@nestjs/common';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
 import { CashTransactionsService } from './cash-transactions.service';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto';
@@ -42,6 +42,7 @@ import { Scope } from '../../../platform-saas/users/constants/scope.enum';
 import { AuthenticatedUser } from '../../../auth/interfaces/authenticated-user.interface';
 import {
   OneCashTransactionResponseDto,
+  OneCashTransactionDetailResponseDto,
   PaginatedCashTransactionsResponseDto,
 } from './dto/cash-transaction-response.dto';
 import {
@@ -106,9 +107,9 @@ export class CashTransactionsController {
   })
   async create(
     @Body() dto: CreateCashTransactionDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashTransactionResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashTransactionsService.create(
       dto,
       authenticatedUserMerchantId,
@@ -129,10 +130,22 @@ export class CashTransactionsController {
       "Retrieves all cash transactions for the authenticated user's merchant with filtering and pagination support.",
   })
   @ApiQuery({
+    name: 'merchantId',
+    required: false,
+    type: Number,
+    description: 'Merchant context (derived from JWT; whitelisted for client compatibility)',
+  })
+  @ApiQuery({
     name: 'cashDrawerId',
     required: false,
     type: Number,
     description: 'Filter by cash drawer ID',
+  })
+  @ApiQuery({
+    name: 'shiftId',
+    required: false,
+    type: Number,
+    description: 'Filter by cash shift ID',
   })
   @ApiQuery({
     name: 'orderId',
@@ -145,13 +158,25 @@ export class CashTransactionsController {
     required: false,
     enum: CashTransactionType,
     description:
-      'Filter by transaction type (opening, sale, refund, tip, withdrawal, adjustment_up, adjustment_down, close, pause)',
+      'Filter by transaction type (opening, sale, refund, tip, withdrawal, adjustment_up, adjustment_down, close, pause). Also accepts uppercase labels: SALE, REFUND, PAY_IN, PAY_OUT, DRAWER_DROP.',
   })
   @ApiQuery({
     name: 'status',
     required: false,
     enum: CashTransactionStatus,
-    description: 'Filter by transaction status (active, deleted)',
+    description: 'Filter by transaction status (active, deleted). Also accepts ACTIVE, VOIDED, AUDITED, RECONCILED.',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    type: String,
+    description: 'Filter by created_at >= startDate (YYYY-MM-DD)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    type: String,
+    description: 'Filter by created_at <= endDate (YYYY-MM-DD)',
   })
   @ApiQuery({
     name: 'page',
@@ -212,9 +237,9 @@ export class CashTransactionsController {
   @ApiForbiddenResponse({ description: 'Forbidden', type: ErrorResponse })
   async findAll(
     @Query() query: GetCashTransactionsQueryDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaginatedCashTransactionsResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashTransactionsService.findAll(
       query,
       authenticatedUserMerchantId,
@@ -237,7 +262,7 @@ export class CashTransactionsController {
   @ApiParam({ name: 'id', type: Number, description: 'Cash transaction ID' })
   @ApiOkResponse({
     description: 'Cash transaction retrieved successfully',
-    type: OneCashTransactionResponseDto,
+    type: OneCashTransactionDetailResponseDto,
     example: {
       statusCode: 200,
       message: 'Cash transaction retrieved successfully',
@@ -252,6 +277,26 @@ export class CashTransactionsController {
         notes: 'Some notes',
         createdAt: '2024-01-15T08:00:00Z',
         updatedAt: '2024-01-15T08:00:00Z',
+        collaborator: { id: 5, name: 'John Doe', role: 'waiter' },
+        cashShift: {
+          id: 7,
+          status: 'CLOSED',
+          openedAt: '2024-01-15T07:00:00Z',
+          closedAt: '2024-01-15T20:00:00Z',
+          openingBalance: 1000.0,
+          openedByCollaborator: { id: 5, name: 'John Doe', role: 'waiter' },
+          closedByCollaborator: { id: 5, name: 'John Doe', role: 'waiter' },
+        },
+        loyaltyPointTransactions: [
+          {
+            id: 55,
+            description: 'Points earned from order',
+            source: 'ORDER',
+            points: 150,
+            loyaltyCustomerId: 3,
+            createdAt: '2024-01-15T08:00:00Z',
+          },
+        ],
       },
     },
   })
@@ -261,9 +306,9 @@ export class CashTransactionsController {
   @ApiNotFoundResponse({ description: 'Not found', type: ErrorResponse })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
-  ): Promise<OneCashTransactionResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<OneCashTransactionDetailResponseDto> {
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashTransactionsService.findOne(
       id,
       authenticatedUserMerchantId,
@@ -312,9 +357,9 @@ export class CashTransactionsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCashTransactionDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashTransactionResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashTransactionsService.update(
       id,
       dto,
@@ -362,9 +407,9 @@ export class CashTransactionsController {
   @ApiNotFoundResponse({ description: 'Not found', type: ErrorResponse })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashTransactionResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashTransactionsService.remove(id, authenticatedUserMerchantId);
   }
 }

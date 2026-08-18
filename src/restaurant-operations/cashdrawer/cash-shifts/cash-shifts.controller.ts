@@ -43,7 +43,7 @@ export class CashShiftsController {
         @Body() dto: CreateCashShiftDto,
         @CurrentUser() user: AuthenticatedUser,
     ) {
-        return this.cashShiftsService.openShift(dto, user.merchant.id);
+        return this.cashShiftsService.openShift(dto, user);
     }
 
     @ApiOperation({ summary: 'List all cash shifts' })
@@ -81,7 +81,7 @@ export class CashShiftsController {
     @ApiOperation({
         summary: 'Close a cash shift',
         description:
-            'The backend calculates the systemAmount (system balance), the difference (declaredAmount - systemAmount), and registers the closing. The frontend only sends declaredAmount and collaboratorId.',
+            'The backend calculates the systemAmount (system balance), the difference (declaredAmount - systemAmount), and registers the closing. The closing collaborator is resolved automatically from the authenticated session; the frontend only sends declaredAmount.',
     })
     @ApiOkResponse({ description: 'Cash shift closed successfully with shift summary' })
     @ApiBadRequestResponse({ description: 'The cash shift is not in OPEN status' })

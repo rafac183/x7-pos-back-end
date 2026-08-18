@@ -33,6 +33,7 @@ import {
   ApiForbiddenResponse,
   ApiQuery,
 } from '@nestjs/swagger';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { AuthenticatedUser } from '../../../auth/interfaces/authenticated-user.interface';
 import { OneCashDrawerHistoryResponseDto } from './dto/cash-drawer-history-response.dto';
 import { GetCashDrawerHistoryQueryDto } from './dto/get-cash-drawer-history-query.dto';
@@ -109,9 +110,9 @@ export class CashDrawerHistoryController {
   })
   async create(
     @Body() dto: CreateCashDrawerHistoryDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashDrawerHistoryResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashDrawerHistoryService.create(
       dto,
       authenticatedUserMerchantId,
@@ -215,9 +216,9 @@ export class CashDrawerHistoryController {
   })
   async findAll(
     @Query() query: GetCashDrawerHistoryQueryDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaginatedCashDrawerHistoryResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashDrawerHistoryService.findAll(
       query,
       authenticatedUserMerchantId,
@@ -259,9 +260,9 @@ export class CashDrawerHistoryController {
   })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashDrawerHistoryResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashDrawerHistoryService.findOne(
       id,
       authenticatedUserMerchantId,
@@ -331,9 +332,9 @@ export class CashDrawerHistoryController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCashDrawerHistoryDto,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashDrawerHistoryResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashDrawerHistoryService.update(
       id,
       dto,
@@ -384,9 +385,9 @@ export class CashDrawerHistoryController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<OneCashDrawerHistoryResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = user.merchant?.id;
     return this.cashDrawerHistoryService.remove(
       id,
       authenticatedUserMerchantId,

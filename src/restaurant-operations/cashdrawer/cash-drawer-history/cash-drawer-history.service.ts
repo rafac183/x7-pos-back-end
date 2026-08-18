@@ -613,11 +613,13 @@ export class CashDrawerHistoryService {
         role: cashDrawerHistory.openedByCollaborator.role,
       },
       closedBy: cashDrawerHistory.closed_by,
-      closedByCollaborator: {
-        id: cashDrawerHistory.closedByCollaborator.id,
-        name: cashDrawerHistory.closedByCollaborator.name,
-        role: cashDrawerHistory.closedByCollaborator.role,
-      },
+      closedByCollaborator: cashDrawerHistory.closedByCollaborator
+        ? {
+            id: cashDrawerHistory.closedByCollaborator.id,
+            name: cashDrawerHistory.closedByCollaborator.name,
+            role: cashDrawerHistory.closedByCollaborator.role,
+          }
+        : null,
       status: cashDrawerHistory.status,
       createdAt: cashDrawerHistory.created_at,
       updatedAt: cashDrawerHistory.updated_at,

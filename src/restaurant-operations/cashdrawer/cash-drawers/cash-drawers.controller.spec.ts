@@ -4,7 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CashDrawersController } from './cash-drawers.controller';
 import { CashDrawersService } from './cash-drawers.service';
 import { CreateCashDrawerDto } from './dto/create-cash-drawer.dto';
-import { UpdateCashDrawerDto } from './dto/update-cash-drawer.dto';
+import { CloseCashDrawerDto } from './dto/close-cash-drawer.dto';
 import { GetCashDrawersQueryDto } from './dto/get-cash-drawers-query.dto';
 import {
   OneCashDrawerResponseDto,
@@ -114,52 +114,31 @@ describe('CashDrawersController', () => {
 
   describe('POST /cash-drawers (create)', () => {
     const createDto: CreateCashDrawerDto = {
-      shiftId: 1,
       openingBalance: 100.0,
-      openedBy: 1,
     };
 
     it('should create a new cash drawer successfully', async () => {
       const createSpy = jest.spyOn(service, 'create');
       createSpy.mockResolvedValue(mockOneCashDrawerResponse);
 
-      const result = await controller.create(createDto, mockRequest as any);
+      const result = await controller.create(createDto, mockUser as any);
 
-      expect(createSpy).toHaveBeenCalledWith(createDto, mockUser.merchant.id);
+      expect(createSpy).toHaveBeenCalledWith(createDto, mockUser);
       expect(result).toEqual(mockOneCashDrawerResponse);
       expect(result.statusCode).toBe(201);
       expect(result.message).toBe('Cash drawer created successfully');
     });
 
     it('should handle service errors during creation', async () => {
-      const errorMessage = 'Shift not found';
+      const errorMessage =
+        'No active shift found. Start a shift before opening a cash drawer.';
       const createSpy = jest.spyOn(service, 'create');
       createSpy.mockRejectedValue(new Error(errorMessage));
 
       await expect(
-        controller.create(createDto, mockRequest as any),
+        controller.create(createDto, mockUser as any),
       ).rejects.toThrow(errorMessage);
-      expect(createSpy).toHaveBeenCalledWith(createDto, mockUser.merchant.id);
-    });
-
-    it('should throw ForbiddenException if user has no merchant_id', async () => {
-      const requestWithoutMerchant = {
-        user: {
-          id: 1,
-          email: 'test@example.com',
-        },
-      };
-      const createSpy = jest.spyOn(service, 'create');
-      createSpy.mockRejectedValue(
-        new ForbiddenException(
-          'You must be associated with a merchant to create cash drawers',
-        ),
-      );
-
-      await expect(
-        controller.create(createDto, requestWithoutMerchant as any),
-      ).rejects.toThrow(ForbiddenException);
-      expect(createSpy).toHaveBeenCalledWith(createDto, undefined);
+      expect(createSpy).toHaveBeenCalledWith(createDto, mockUser);
     });
   });
 
@@ -301,11 +280,11 @@ describe('CashDrawersController', () => {
   });
 
   describe('PUT /cash-drawers/:id (update)', () => {
-    const updateDto: UpdateCashDrawerDto = {
-      openingBalance: 150.0,
+    const closeDto: CloseCashDrawerDto = {
+      closingBalance: 150.0,
     };
 
-    it('should update a cash drawer successfully', async () => {
+    it('should close a cash drawer successfully', async () => {
       const updateSpy = jest.spyOn(service, 'update');
       const updatedResponse: OneCashDrawerResponseDto = {
         ...mockOneCashDrawerResponse,
@@ -313,22 +292,17 @@ describe('CashDrawersController', () => {
         message: 'Cash drawer updated successfully',
         data: {
           ...mockCashDrawerResponseData,
-          openingBalance: 150.0,
-          currentBalance: 150.0,
+          closingBalance: 150.0,
+          status: CashDrawerStatus.CLOSE,
         },
       };
       updateSpy.mockResolvedValue(updatedResponse);
 
-      const result = await controller.update(1, updateDto, mockRequest as any);
+      const result = await controller.update(1, closeDto, mockUser as any);
 
-      expect(updateSpy).toHaveBeenCalledWith(
-        1,
-        updateDto,
-        mockUser.merchant.id,
-      );
+      expect(updateSpy).toHaveBeenCalledWith(1, closeDto, mockUser);
       expect(result).toEqual(updatedResponse);
       expect(result.statusCode).toBe(200);
-      expect(result.message).toBe('Cash drawer updated successfully');
     });
 
     it('should handle service errors during update', async () => {
@@ -337,61 +311,32 @@ describe('CashDrawersController', () => {
       updateSpy.mockRejectedValue(new Error(errorMessage));
 
       await expect(
-        controller.update(1, updateDto, mockRequest as any),
+        controller.update(1, closeDto, mockUser as any),
       ).rejects.toThrow(errorMessage);
-      expect(updateSpy).toHaveBeenCalledWith(
-        1,
-        updateDto,
-        mockUser.merchant.id,
-      );
+      expect(updateSpy).toHaveBeenCalledWith(1, closeDto, mockUser);
     });
 
-    it('should handle partial updates', async () => {
-      const partialDto: UpdateCashDrawerDto = {
-        closingBalance: 200.0,
-        closedBy: 1,
-      };
+    it('should propagate a Discrepancy status from the service response', async () => {
       const updateSpy = jest.spyOn(service, 'update');
-      const updatedResponse: OneCashDrawerResponseDto = {
+      const discrepancyResponse: OneCashDrawerResponseDto = {
         ...mockOneCashDrawerResponse,
         statusCode: 200,
         message: 'Cash drawer updated successfully',
         data: {
           ...mockCashDrawerResponseData,
-          closingBalance: 200.0,
-          status: CashDrawerStatus.CLOSE,
+          closingBalance: 90.0,
+          status: CashDrawerStatus.DISCREPANCY,
         },
       };
-      updateSpy.mockResolvedValue(updatedResponse);
+      updateSpy.mockResolvedValue(discrepancyResponse);
 
-      const result = await controller.update(1, partialDto, mockRequest as any);
-
-      expect(updateSpy).toHaveBeenCalledWith(
+      const result = await controller.update(
         1,
-        partialDto,
-        mockUser.merchant.id,
-      );
-      expect(result.data.status).toBe(CashDrawerStatus.CLOSE);
-    });
-
-    it('should throw ForbiddenException if user has no merchant_id', async () => {
-      const requestWithoutMerchant = {
-        user: {
-          id: 1,
-          email: 'test@example.com',
-        },
-      };
-      const updateSpy = jest.spyOn(service, 'update');
-      updateSpy.mockRejectedValue(
-        new ForbiddenException(
-          'You must be associated with a merchant to update cash drawers',
-        ),
+        { closingBalance: 90.0 },
+        mockUser as any,
       );
 
-      await expect(
-        controller.update(1, updateDto, requestWithoutMerchant as any),
-      ).rejects.toThrow(ForbiddenException);
-      expect(updateSpy).toHaveBeenCalledWith(1, updateDto, undefined);
+      expect(result.data.status).toBe(CashDrawerStatus.DISCREPANCY);
     });
   });
 

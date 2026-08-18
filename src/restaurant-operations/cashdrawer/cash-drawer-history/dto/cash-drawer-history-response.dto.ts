@@ -64,12 +64,14 @@ export class CashDrawerHistoryResponseDto {
 
   @ApiProperty({
     example: 2,
-    description: 'Identifier of the Collaborator who closed the cash drawer',
+    nullable: true,
+    description: 'Identifier of the Collaborator who closed the cash drawer (null if not yet closed)',
   })
-  closedBy: number;
+  closedBy: number | null;
 
   @ApiProperty({
-    description: 'Basic collaborator information who closed the cash drawer',
+    description: 'Basic collaborator information who closed the cash drawer (null if not yet closed)',
+    nullable: true,
     example: {
       id: 2,
       name: 'María García',
@@ -80,7 +82,7 @@ export class CashDrawerHistoryResponseDto {
     id: number;
     name: string;
     role: string;
-  };
+  } | null;
 
   @ApiProperty({
     example: CashDrawerHistoryStatus.ACTIVE,
