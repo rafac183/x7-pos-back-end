@@ -12,6 +12,7 @@ import { Movement } from 'src/inventory/products-inventory/stocks/movements/enti
 import { RawMaterialCategoriesController } from './categories/raw-material-categories.controller';
 import { RawMaterialCategoriesService } from './categories/raw-material-categories.service';
 import { RawMaterialStockController } from './raw-material-stock.controller';
+import { InventoryJournalLinesController } from './inventory-journal-lines.controller';
 import { Item } from '../products-inventory/stocks/items/entities/item.entity';
 import { Location } from '../products-inventory/stocks/locations/entities/location.entity';
 import { ItemsModule } from '../products-inventory/stocks/items/items.module';
@@ -40,6 +41,7 @@ import { MovementsModule } from '../products-inventory/stocks/movements/movement
     SuppliesController,
     RawMaterialCategoriesController,
     RawMaterialStockController,
+    InventoryJournalLinesController,
   ],
   providers: [SuppliesService, RawMaterialCategoriesService],
   exports: [SuppliesService, RawMaterialCategoriesService],

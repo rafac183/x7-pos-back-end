@@ -60,6 +60,8 @@ describe('MovementsService', () => {
   } as Location;
 
   const mockItem: Item = {
+    minimumQty: 0,
+    weightedAverageUnitCost: '0.0000',
     id: 1,
     currentQty: 10,
     productId: mockProduct.id,
@@ -73,6 +75,15 @@ describe('MovementsService', () => {
   };
 
   const mockMovement: Movement = {
+    supplierInvoiceId: null,
+    supplierInvoice: null,
+    sourceLocationId: null,
+    sourceLocation: null,
+    destinationLocationId: null,
+    destinationLocation: null,
+    createdBy: null,
+    movementType: null,
+    unitCost: null,
     id: 1,
     stockItemId: mockItem.id,
     item: mockItem,
@@ -220,6 +231,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Created successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: mockMovement.id,
           item: {
             id: mockMovement.item?.id,
@@ -462,6 +477,10 @@ describe('MovementsService', () => {
         statusCode: 200,
         message: 'Movement retrieved successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: mockMovement.id,
           item: {
             id: mockMovement.item?.id,
@@ -531,6 +550,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: {
             id: mockItem.id,
@@ -599,6 +622,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: {
             id: mockItem.id,
@@ -653,6 +680,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: { id: mockItem.id, currentQty: mockItem.currentQty },
           quantity: updatedMovement.quantity,
@@ -695,6 +726,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: { id: mockItem.id, currentQty: mockItem.currentQty },
           quantity: mockMovement.quantity,
@@ -737,6 +772,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: { id: mockItem.id, currentQty: mockItem.currentQty },
           quantity: mockMovement.quantity,
@@ -779,6 +818,10 @@ describe('MovementsService', () => {
         statusCode: 201,
         message: 'Movement Updated successfully',
         data: {
+          sourceLocationId: null,
+          destinationLocationId: null,
+          createdBy: null,
+          movementType: null,
           id: updatedMovement.id,
           item: { id: mockItem.id, currentQty: mockItem.currentQty },
           quantity: mockMovement.quantity,

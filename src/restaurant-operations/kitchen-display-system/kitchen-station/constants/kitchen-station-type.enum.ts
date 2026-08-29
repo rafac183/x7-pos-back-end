@@ -5,4 +5,5 @@ export enum KitchenStationType {
   DESSERT = 'DESSERT',
   PREP = 'PREP',
   PACKING = 'PACKING',
+  EXPO = 'EXPO',
 }

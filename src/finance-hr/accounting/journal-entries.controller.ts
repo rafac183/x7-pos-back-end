@@ -1,0 +1,297 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  NotFoundException,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Scopes } from 'src/auth/decorators/scopes.decorator';
+import { UserRole } from 'src/platform-saas/users/constants/role.enum';
+import { Scope } from 'src/platform-saas/users/constants/scope.enum';
+
+export interface JournalEntryLineDto {
+  id: number;
+  account: { id: number; code: string; name: string };
+  debit: number;
+  credit: number;
+  description?: string;
+}
+
+export interface JournalEntryDto {
+  id: number;
+  entry_number: string;
+  entry_date: string;
+  description: string;
+  status: 'DRAFT' | 'POSTED' | 'VOIDED';
+  total_debit: number;
+  total_credit: number;
+  is_balanced: boolean;
+  reference_type?: 'ORDER' | 'INVENTORY' | 'ADJUSTMENT' | 'MANUAL';
+  reference_id?: number | null;
+  created_at: string;
+  updated_at: string;
+  company?: { id: number; name: string };
+  lines: JournalEntryLineDto[];
+}
+
+let MOCK_JOURNAL_ENTRIES: JournalEntryDto[] = [
+  {
+    id: 1,
+    entry_number: 'JE-2026-001',
+    entry_date: '2026-08-20',
+    description: 'Stock Receipt: 50 KG Flour 25kg bag via Purchase Order #PO-2026-089',
+    status: 'POSTED',
+    total_debit: 1250.00,
+    total_credit: 1250.00,
+    is_balanced: true,
+    reference_type: 'INVENTORY',
+    reference_id: 89,
+    created_at: '2026-08-20T10:00:00Z',
+    updated_at: '2026-08-20T10:00:00Z',
+    company: { id: 1, name: 'Main Merchant Branch' },
+    lines: [
+      {
+        id: 101,
+        account: { id: 2, code: '1100', name: 'Raw Material Inventory' },
+        debit: 1250.00,
+        credit: 0.00,
+        description: 'Stock receipt: 50.0 KG Flour 25kg bag via PO #PO-2026-089',
+      },
+      {
+        id: 102,
+        account: { id: 6, code: '2100', name: 'Accounts Payable' },
+        debit: 0.00,
+        credit: 1250.00,
+        description: 'Supplier Accounts Payable liability for Purchase Order #PO-2026-089',
+      },
+    ],
+  },
+  {
+    id: 2,
+    entry_number: 'JE-2026-002',
+    entry_date: '2026-08-19',
+    description: 'POS Sales Depletion & Cost Allocation Order #1088',
+    status: 'POSTED',
+    total_debit: 345.50,
+    total_credit: 345.50,
+    is_balanced: true,
+    reference_type: 'ORDER',
+    reference_id: 1088,
+    created_at: '2026-08-19T15:30:00Z',
+    updated_at: '2026-08-19T15:30:00Z',
+    company: { id: 1, name: 'Main Merchant Branch' },
+    lines: [
+      {
+        id: 103,
+        account: { id: 13, code: '5100', name: 'Cost of Goods Sold' },
+        debit: 345.50,
+        credit: 0.00,
+        description: 'Stock depletion: 15.5 KG Flour 25kg bag via POS Sales Order #1088',
+      },
+      {
+        id: 104,
+        account: { id: 2, code: '1100', name: 'Raw Material Inventory' },
+        debit: 0.00,
+        credit: 345.50,
+        description: 'Raw material inventory reduction via POS Sales Order #1088',
+      },
+    ],
+  },
+  {
+    id: 3,
+    entry_number: 'JE-2026-003',
+    entry_date: '2026-08-18',
+    description: 'Stock Waste Write-off: Expired Whole Milk Batch #042',
+    status: 'POSTED',
+    total_debit: 88.00,
+    total_credit: 88.00,
+    is_balanced: true,
+    reference_type: 'INVENTORY',
+    reference_id: 42,
+    created_at: '2026-08-18T09:15:00Z',
+    updated_at: '2026-08-18T09:15:00Z',
+    company: { id: 1, name: 'Main Merchant Branch' },
+    lines: [
+      {
+        id: 105,
+        account: { id: 14, code: '5200', name: 'Waste & Shrinkage Expense' },
+        debit: 88.00,
+        credit: 0.00,
+        description: 'Inventory waste breakdown: 2.0 L Whole Milk (Expired batch)',
+      },
+      {
+        id: 106,
+        account: { id: 2, code: '1100', name: 'Raw Material Inventory' },
+        debit: 0.00,
+        credit: 88.00,
+        description: 'Raw material inventory write-off for expired batch #042',
+      },
+    ],
+  },
+  {
+    id: 4,
+    entry_number: 'JE-2026-004',
+    entry_date: '2026-08-17',
+    description: 'Physical Inventory Audit Adjustment - Main Storage Hub',
+    status: 'DRAFT',
+    total_debit: 150.00,
+    total_credit: 150.00,
+    is_balanced: true,
+    reference_type: 'ADJUSTMENT',
+    reference_id: 15,
+    created_at: '2026-08-17T11:45:00Z',
+    updated_at: '2026-08-17T11:45:00Z',
+    company: { id: 1, name: 'Main Merchant Branch' },
+    lines: [
+      {
+        id: 107,
+        account: { id: 2, code: '1100', name: 'Raw Material Inventory' },
+        debit: 150.00,
+        credit: 0.00,
+        description: 'Physical count adjustment: System count 10 -> Actual count 15 (+5 units)',
+      },
+      {
+        id: 108,
+        account: { id: 15, code: '5300', name: 'Inventory Adjustment Variance' },
+        debit: 0.00,
+        credit: 150.00,
+        description: 'Physical count variance adjustment gain credit',
+      },
+    ],
+  },
+];
+
+@ApiTags('Journal Entries Engine')
+@ApiBearerAuth()
+@Controller('journal-entry')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class JournalEntriesController {
+  @Get()
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB, Scope.MERCHANT_ANDROID, Scope.MERCHANT_IOS)
+  @ApiOperation({ summary: 'Get journal entries directory' })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'referenceType', required: false, type: String })
+  async getEntries(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('referenceType') referenceType?: string,
+  ) {
+    let filtered = [...MOCK_JOURNAL_ENTRIES];
+
+    if (search) {
+      const term = search.toLowerCase().trim();
+      filtered = filtered.filter(
+        (e) =>
+          e.entry_number.toLowerCase().includes(term) ||
+          e.description.toLowerCase().includes(term) ||
+          e.lines.some((l) => l.account?.code.toLowerCase().includes(term) || l.account?.name.toLowerCase().includes(term)),
+      );
+    }
+
+    if (status) {
+      filtered = filtered.filter((e) => e.status === status);
+    }
+
+    if (referenceType) {
+      filtered = filtered.filter((e) => e.reference_type === referenceType);
+    }
+
+    return {
+      data: filtered,
+      total: filtered.length,
+    };
+  }
+
+  @Post()
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB)
+  @ApiOperation({ summary: 'Create new journal entry' })
+  async createEntry(@Body() dto: any) {
+    const nextSeq = MOCK_JOURNAL_ENTRIES.length + 1;
+    const entryNumber = `JE-2026-00${nextSeq}`;
+
+    const lines: JournalEntryLineDto[] = (dto.lines || []).map((l: any, idx: number) => ({
+      id: Date.now() + idx,
+      account: {
+        id: l.account_id || 1100,
+        code: l.account_code || '1100',
+        name: l.account_name || 'Raw Material Inventory',
+      },
+      debit: Number(l.debit || 0),
+      credit: Number(l.credit || 0),
+      description: l.description || '',
+    }));
+
+    const totalDebit = lines.reduce((acc, l) => acc + l.debit, 0);
+    const totalCredit = lines.reduce((acc, l) => acc + l.credit, 0);
+
+    const newEntry: JournalEntryDto = {
+      id: Date.now(),
+      entry_number: entryNumber,
+      entry_date: dto.entry_date || new Date().toISOString().split('T')[0],
+      description: dto.description || 'Manual Journal Entry',
+      status: 'DRAFT',
+      total_debit: totalDebit,
+      total_credit: totalCredit,
+      is_balanced: Math.abs(totalDebit - totalCredit) < 0.01,
+      reference_type: dto.reference_type || 'MANUAL',
+      reference_id: dto.reference_id || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      company: { id: 1, name: 'Main Merchant Branch' },
+      lines,
+    };
+
+    MOCK_JOURNAL_ENTRIES.unshift(newEntry);
+    return { data: newEntry };
+  }
+
+  @Post(':id/post')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB)
+  @ApiOperation({ summary: 'Post journal entry' })
+  async postEntry(@Param('id') id: string) {
+    const entry = MOCK_JOURNAL_ENTRIES.find((e) => e.id === Number(id));
+    if (!entry) throw new NotFoundException(`Journal entry #${id} not found`);
+
+    entry.status = 'POSTED';
+    entry.updated_at = new Date().toISOString();
+
+    return { data: entry };
+  }
+
+  @Post(':id/void')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB)
+  @ApiOperation({ summary: 'Void journal entry' })
+  async voidEntry(@Param('id') id: string) {
+    const entry = MOCK_JOURNAL_ENTRIES.find((e) => e.id === Number(id));
+    if (!entry) throw new NotFoundException(`Journal entry #${id} not found`);
+
+    entry.status = 'VOIDED';
+    entry.updated_at = new Date().toISOString();
+
+    return { data: entry };
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB)
+  @ApiOperation({ summary: 'Delete draft journal entry' })
+  async deleteEntry(@Param('id') id: string) {
+    const numericId = Number(id);
+    MOCK_JOURNAL_ENTRIES = MOCK_JOURNAL_ENTRIES.filter((e) => e.id !== numericId);
+    return { success: true };
+  }
+}

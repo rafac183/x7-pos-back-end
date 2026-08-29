@@ -27,6 +27,8 @@ import {
 } from './dto/kitchen-station-response.dto';
 import { PaginatedKitchenStationResponseDto } from './dto/paginated-kitchen-station-response.dto';
 import { KitchenStationStatus } from './constants/kitchen-station-status.enum';
+import { KitchenStationType } from './constants/kitchen-station-type.enum';
+import { KitchenDisplayMode } from './constants/kitchen-display-mode.enum';
 
 @Injectable()
 export class KitchenStationService {
@@ -58,35 +60,61 @@ export class KitchenStationService {
     }
 
     // Business rule validation: name must not be empty
-    if (
-      !createKitchenStationDto.name ||
-      createKitchenStationDto.name.trim().length === 0
-    ) {
+    const trimmedName = createKitchenStationDto.name ? createKitchenStationDto.name.trim() : '';
+    if (!trimmedName) {
       throw new BadRequestException('Name cannot be empty');
     }
 
-    if (createKitchenStationDto.name.length > 100) {
+    if (trimmedName.length > 100) {
       throw new BadRequestException('Name cannot exceed 100 characters');
     }
 
+    // Unique Name Constraint per Merchant
+    const duplicate = await this.kitchenStationRepository
+      .createQueryBuilder('ks')
+      .where('ks.merchant_id = :merchantId', { merchantId: authenticatedUserMerchantId })
+      .andWhere('LOWER(ks.name) = LOWER(:name)', { name: trimmedName })
+      .andWhere('ks.status = :status', { status: KitchenStationStatus.ACTIVE })
+      .getOne();
+
+    if (duplicate) {
+      throw new ConflictException(
+        `A station named '${trimmedName}' already exists for this store.`,
+      );
+    }
+
     // Business rule validation: display order must be non-negative
-    if (createKitchenStationDto.displayOrder < 0) {
+    const targetOrder = createKitchenStationDto.displayOrder ?? 1;
+    if (targetOrder < 0) {
       throw new BadRequestException('Display order must be non-negative');
     }
+
+    // Automatic Display Order Re-Sequencing: shift existing order >= targetOrder
+    await this.kitchenStationRepository
+      .createQueryBuilder()
+      .update(KitchenStation)
+      .set({ display_order: () => 'display_order + 1' })
+      .where('merchant_id = :merchantId', { merchantId: authenticatedUserMerchantId })
+      .andWhere('display_order >= :targetOrder', { targetOrder })
+      .andWhere('status = :status', { status: KitchenStationStatus.ACTIVE })
+      .execute();
 
     // Create kitchen station
     const kitchenStation = new KitchenStation();
     kitchenStation.merchant_id = authenticatedUserMerchantId;
-    kitchenStation.name = createKitchenStationDto.name.trim();
+    kitchenStation.name = trimmedName;
     kitchenStation.station_type = createKitchenStationDto.stationType;
     kitchenStation.display_mode = createKitchenStationDto.displayMode;
-    kitchenStation.display_order = createKitchenStationDto.displayOrder;
+    kitchenStation.display_order = targetOrder;
     kitchenStation.printer_name = createKitchenStationDto.printerName || null;
     kitchenStation.is_active = true; // Always set to true on creation
     kitchenStation.status = KitchenStationStatus.ACTIVE;
 
     const savedKitchenStation =
       await this.kitchenStationRepository.save(kitchenStation);
+
+    // Re-sequence all active stations for this merchant to maintain a clean gapless 1..N order
+    await this.resequenceStations(authenticatedUserMerchantId);
 
     // Fetch the complete kitchen station with relations
     const completeKitchenStation = await this.kitchenStationRepository.findOne({
@@ -189,7 +217,7 @@ export class KitchenStationService {
     }
 
     // Execute query
-    const [kitchenStations, total] =
+    let [kitchenStations, total] =
       await this.kitchenStationRepository.findAndCount({
         where: whereConditions,
         relations: ['merchant'],
@@ -197,6 +225,8 @@ export class KitchenStationService {
         skip,
         take: limit,
       });
+
+
 
     // Calculate pagination metadata
     const totalPages = Math.ceil(total / limit);
@@ -296,23 +326,47 @@ export class KitchenStationService {
 
     // Business rule validation: name must not be empty if provided
     if (updateKitchenStationDto.name !== undefined) {
-      if (
-        !updateKitchenStationDto.name ||
-        updateKitchenStationDto.name.trim().length === 0
-      ) {
+      const trimmedName = updateKitchenStationDto.name.trim();
+      if (!trimmedName) {
         throw new BadRequestException('Name cannot be empty');
       }
-      if (updateKitchenStationDto.name.length > 100) {
+      if (trimmedName.length > 100) {
         throw new BadRequestException('Name cannot exceed 100 characters');
+      }
+
+      // Check unique name per merchant
+      const duplicate = await this.kitchenStationRepository
+        .createQueryBuilder('ks')
+        .where('ks.merchant_id = :merchantId', { merchantId: authenticatedUserMerchantId })
+        .andWhere('LOWER(ks.name) = LOWER(:name)', { name: trimmedName })
+        .andWhere('ks.status = :status', { status: KitchenStationStatus.ACTIVE })
+        .andWhere('ks.id != :id', { id })
+        .getOne();
+
+      if (duplicate) {
+        throw new ConflictException(
+          `A station named '${trimmedName}' already exists for this store.`,
+        );
       }
     }
 
     // Business rule validation: display order must be non-negative if provided
-    if (
-      updateKitchenStationDto.displayOrder !== undefined &&
-      updateKitchenStationDto.displayOrder < 0
-    ) {
-      throw new BadRequestException('Display order must be non-negative');
+    if (updateKitchenStationDto.displayOrder !== undefined) {
+      const targetOrder = updateKitchenStationDto.displayOrder;
+      if (targetOrder < 0) {
+        throw new BadRequestException('Display order must be non-negative');
+      }
+      if (targetOrder !== existingKitchenStation.display_order) {
+        await this.kitchenStationRepository
+          .createQueryBuilder()
+          .update(KitchenStation)
+          .set({ display_order: () => 'display_order + 1' })
+          .where('merchant_id = :merchantId', { merchantId: authenticatedUserMerchantId })
+          .andWhere('display_order >= :targetOrder', { targetOrder })
+          .andWhere('id != :id', { id })
+          .andWhere('status = :status', { status: KitchenStationStatus.ACTIVE })
+          .execute();
+      }
     }
 
     // Update kitchen station
@@ -330,7 +384,17 @@ export class KitchenStationService {
     if (updateKitchenStationDto.isActive !== undefined)
       updateData.is_active = updateKitchenStationDto.isActive;
 
+    if (updateKitchenStationDto.status !== undefined) {
+      updateData.status = updateKitchenStationDto.status;
+      if (updateKitchenStationDto.status === KitchenStationStatus.DELETED) {
+        updateData.is_active = false;
+      }
+    }
+
     await this.kitchenStationRepository.update(id, updateData);
+
+    // Re-sequence all active stations for this merchant to maintain a clean gapless 1..N order
+    await this.resequenceStations(authenticatedUserMerchantId);
 
     // Fetch updated kitchen station
     const updatedKitchenStation = await this.kitchenStationRepository.findOne({
@@ -388,13 +452,40 @@ export class KitchenStationService {
 
     // Perform logical deletion
     existingKitchenStation.status = KitchenStationStatus.DELETED;
+    existingKitchenStation.is_active = false;
     await this.kitchenStationRepository.save(existingKitchenStation);
+
+    // Re-sequence remaining active stations
+    await this.resequenceStations(authenticatedUserMerchantId);
 
     return {
       statusCode: 200,
       message: 'Kitchen station deleted successfully',
       data: this.formatKitchenStationResponse(existingKitchenStation),
     };
+  }
+
+  private async resequenceStations(merchantId: number): Promise<void> {
+    const stations = await this.kitchenStationRepository.find({
+      where: {
+        merchant_id: merchantId,
+        status: KitchenStationStatus.ACTIVE,
+      },
+      order: {
+        display_order: 'ASC',
+        updated_at: 'DESC',
+        id: 'ASC',
+      },
+    });
+
+    for (let i = 0; i < stations.length; i++) {
+      const expectedOrder = i + 1;
+      if (stations[i].display_order !== expectedOrder) {
+        await this.kitchenStationRepository.update(stations[i].id, {
+          display_order: expectedOrder,
+        });
+      }
+    }
   }
 
   private formatKitchenStationResponse(
