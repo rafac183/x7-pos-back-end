@@ -12,6 +12,8 @@ import {
 import { Movement } from '../../movements/entities/movement.entity';
 import { Location } from '../../locations/entities/location.entity';
 
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+
 @Entity({ name: 'stock_item' })
 export class Item {
   @ApiProperty({ example: 1, description: 'Item ID' })
@@ -30,33 +32,50 @@ export class Item {
   @Column({ type: 'int', name: 'minimum_qty', nullable: true })
   minimumQty: number | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
     description: 'Product ID associated with the item',
   })
-  @Column({ type: 'int' })
-  productId: number;
+  @Column({ type: 'int', name: 'productId', nullable: true })
+  productId?: number | null;
 
   @ManyToOne(() => Product, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'productId' })
-  product: Product;
+  product?: Product | null;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
     description: 'Variant ID associated with the item',
   })
-  @Column({ type: 'int' })
-  variantId: number;
+  @Column({ type: 'int', name: 'variantId', nullable: true })
+  variantId?: number | null;
 
   @ManyToOne(() => Variant, {
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
+    nullable: true,
   })
   @JoinColumn({ name: 'variantId' })
-  variant: Variant;
+  variant?: Variant | null;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Supply (Raw Material) ID associated with the item',
+  })
+  @Column({ type: 'int', name: 'supply_id', nullable: true })
+  supplyId?: number | null;
+
+  @ManyToOne(() => Supply, {
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    nullable: true,
+  })
+  @JoinColumn({ name: 'supply_id' })
+  supply?: Supply | null;
 
   @ApiProperty({
     example: 1,

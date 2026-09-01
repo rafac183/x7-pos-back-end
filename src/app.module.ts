@@ -32,8 +32,9 @@ import { CashTransaction } from './restaurant-operations/cashdrawer/cash-transac
 import { CashShift } from './restaurant-operations/cashdrawer/cash-shifts/entities/cash-shift.entity';
 import { CashMovement } from './restaurant-operations/cashdrawer/cash-movements/entities/cash-movement.entity';
 import { Category } from './inventory/products-inventory/category/entities/category.entity';
-import { Input } from './inventory/inputs/entities/input.entity';
-import { InputSupplier } from './inventory/inputs/entities/input-supplier.entity';
+import { Supply } from './inventory/supplies/entities/supply.entity';
+import { SupplySupplier } from './inventory/supplies/entities/supply-supplier.entity';
+import { RawMaterialCategory } from './inventory/supplies/categories/entities/raw-material-category.entity';
 import { Collaborator } from './finance-hr/hr/collaborators/entities/collaborator.entity';
 import { CollaboratorContract } from './finance-hr/hr/collaborator-contracts/entities/collaborator-contract.entity';
 import { Company } from './platform-saas/companies/entities/company.entity';
@@ -187,8 +188,9 @@ import { OnboardingSession } from './onboarding/entities/onboarding-session.enti
           CashShift,
           CashMovement,
           Category,
-          Input,
-          InputSupplier,
+          Supply,
+          SupplySupplier,
+          RawMaterialCategory,
           Variant,
           Modifier,
           Location,

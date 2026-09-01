@@ -11,6 +11,12 @@ import { QueryFloorPlanDto } from './dto/query-floor-plan.dto';
 import { PaginatedFloorPlanResponseDto } from './dto/paginated-floor-plan-response.dto';
 import { UpdateFloorPlanDto } from './dto/update-floor-plan.dto';
 
+// Los DTOs ya aceptan el vocabulario del backoffice ('draft' | 'archived') además del legacy
+// ('active' | 'inactive'); si las consultas siguieran filtrando solo por el legacy, un plano
+// guardado como borrador o archivado desaparecería del listado y daría 404 al reabrirlo o
+// editarlo. 'deleted' queda fuera a propósito: es el soft-delete.
+const VISIBLE_STATUSES = ['active', 'inactive', 'draft', 'archived'];
+
 @Injectable()
 export class FloorPlanService {
   constructor(
@@ -40,6 +46,9 @@ export class FloorPlanService {
       name: dto.name,
       width: dto.width,
       height: dto.height,
+      // Normalizamos a null cuando no viene contorno: así el plano queda explícitamente marcado
+      // como "rectángulo completo width × height" en vez de dejar la columna en undefined.
+      outline: dto.outline ?? null,
       status: dto.status,
       merchant: merchant,
     } as Partial<FloorPlan>);
@@ -76,7 +85,7 @@ export class FloorPlanService {
       qb.andWhere('floorPlan.status = :status', { status });
     } else {
       qb.andWhere('floorPlan.status IN (:...statuses)', {
-        statuses: ['active', 'inactive'],
+        statuses: VISIBLE_STATUSES,
       });
     }
 
@@ -108,7 +117,7 @@ export class FloorPlanService {
     }
 
     const floorPlan = await this.floorPlanRepository.findOne({
-      where: { id, status: In(['active', 'inactive']) },
+      where: { id, status: In(VISIBLE_STATUSES) },
       relations: ['merchant'],
     });
     if (!floorPlan) {
@@ -129,13 +138,16 @@ export class FloorPlanService {
       ErrorHandler.invalidId('ID must be a positive integer');
     }
     const floorPlan = await this.floorPlanRepository.findOne({
-      where: { id, status: In(['active', 'inactive']) },
+      where: { id, status: In(VISIBLE_STATUSES) },
       relations: ['merchant'],
     });
     if (!floorPlan) {
       ErrorHandler.floorPlanNotFound();
     }
 
+    // El PATCH es parcial: solo se copian las claves presentes en el dto, así que enviar únicamente
+    // `outline` conserva width/height. Un `outline: null` explícito sí llega (class-validator deja
+    // pasar null con @IsOptional) y devuelve el plano al rectángulo completo.
     Object.assign(floorPlan, dto);
 
     const updatedFloorPlan = await this.floorPlanRepository.save(floorPlan);

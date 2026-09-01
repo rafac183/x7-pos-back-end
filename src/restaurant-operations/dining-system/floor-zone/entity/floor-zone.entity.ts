@@ -46,6 +46,12 @@ export class FloorZone {
   @Column({ type: 'varchar', length: 50, nullable: true })
   color: string;
 
+  // Región de la zona dentro del lienzo del plano, como JSON de puntos en píxeles
+  // (100px = 1m), igual que FloorPlan.outline. Null = la zona no tiene área dibujada
+  // y sólo funciona como etiqueta de color, que es como nacieron todas.
+  @Column({ type: 'text', nullable: true })
+  area: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

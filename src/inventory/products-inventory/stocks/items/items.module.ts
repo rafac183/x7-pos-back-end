@@ -9,12 +9,13 @@ import { Product } from '../../products/entities/product.entity';
 import { Variant } from '../../variants/entities/variant.entity';
 import { Location } from '../locations/entities/location.entity';
 import { StockAlertsModule } from '../../../stock-alerts/stock-alerts.module';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
 
 @Module({
   imports: [
     AuthModule,
     StockAlertsModule,
-    TypeOrmModule.forFeature([Item, Product, Location, Variant]),
+    TypeOrmModule.forFeature([Item, Product, Location, Variant, Supply]),
     forwardRef(() => MovementsModule),
   ],
   controllers: [ItemsController],

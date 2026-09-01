@@ -53,6 +53,20 @@ export class FloorPlan {
   @Column({ type: 'int' })
   height: number;
 
+  // Guarda el polígono (contorno) de la sala en píxeles del lienzo, serializado como JSON dentro de
+  // una columna `text`: así no dependemos del soporte de JSON nativo de cada motor de base de datos.
+  // `null` significa "rectángulo completo width × height", que es como se comportaban los planos
+  // creados antes de existir este campo; por eso es nullable y no tiene valor por defecto.
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: '[{"x":0,"y":0},{"x":800,"y":0},{"x":800,"y":600},{"x":0,"y":600}]',
+    description:
+      'Room outline polygon serialized as JSON, in canvas pixels. Null means the full width × height rectangle.',
+  })
+  @Column({ type: 'text', nullable: true })
+  outline: string | null;
+
   @ApiProperty({
     example: 'active',
     description: 'Status of the floor plan',

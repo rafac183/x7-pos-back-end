@@ -116,6 +116,22 @@ export class Movement {
   @JoinColumn({ name: 'supplier_invoice_id' })
   supplierInvoice: SupplierInvoice | null;
 
+  @ApiPropertyOptional({ example: 1, description: 'Source Location ID' })
+  @Column({ type: 'int', name: 'source_location_id', nullable: true })
+  sourceLocationId: number | null;
+
+  @ApiPropertyOptional({ example: 2, description: 'Destination Location ID' })
+  @Column({ type: 'int', name: 'destination_location_id', nullable: true })
+  destinationLocationId: number | null;
+
+  @ApiPropertyOptional({ example: 'Admin', description: 'User who created the movement' })
+  @Column({ type: 'varchar', length: 255, name: 'created_by', nullable: true })
+  createdBy: string | null;
+
+  @ApiPropertyOptional({ example: 'TRANSFER', description: 'Raw material stock movement type' })
+  @Column({ type: 'varchar', length: 50, name: 'movement_type', nullable: true })
+  movementType: string | null;
+
   @ApiPropertyOptional({
     example: 12.5,
     description: 'Unit cost (WACC) applied on this movement',

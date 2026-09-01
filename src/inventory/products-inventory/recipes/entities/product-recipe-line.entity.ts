@@ -12,6 +12,7 @@ import { Modifier } from '../../modifiers/entities/modifier.entity';
 import { ProductRecipe } from './product-recipe.entity';
 import { RecipeLineType } from '../constants/recipe-line-type.enum';
 import { RecipeQuantityUnit } from '../constants/recipe-quantity-unit.enum';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
 
 @Entity('product_recipe_line')
 export class ProductRecipeLine {
@@ -51,21 +52,37 @@ export class ProductRecipeLine {
   @JoinColumn({ name: 'modifier_id' })
   modifier: Modifier | null;
 
-  @ApiProperty({ example: 5 })
-  @Column({ type: 'int', name: 'supply_product_id' })
-  supplyProductId: number;
+  @ApiPropertyOptional({ example: 5 })
+  @Column({ type: 'int', name: 'supply_product_id', nullable: true })
+  supplyProductId?: number | null;
 
-  @ManyToOne(() => Product, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  @ManyToOne(() => Product, { onDelete: 'CASCADE', onUpdate: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'supply_product_id' })
-  supplyProduct: Product;
+  supplyProduct?: Product | null;
 
-  @ApiProperty({ example: 1 })
-  @Column({ type: 'int', name: 'supply_variant_id' })
-  supplyVariantId: number;
+  @ApiPropertyOptional({ example: 1 })
+  @Column({ type: 'int', name: 'supply_variant_id', nullable: true })
+  supplyVariantId?: number | null;
 
-  @ManyToOne(() => Variant, { onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  @ManyToOne(() => Variant, { onDelete: 'CASCADE', onUpdate: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'supply_variant_id' })
-  supplyVariant: Variant;
+  supplyVariant?: Variant | null;
+
+  @ApiPropertyOptional({ example: 1, description: 'Raw Material (Supply) ID' })
+  @Column({ type: 'int', name: 'raw_material_id', nullable: true })
+  rawMaterialId?: number | null;
+
+  @ManyToOne(() => Supply, { onDelete: 'CASCADE', onUpdate: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'raw_material_id' })
+  rawMaterial?: Supply | null;
+
+  @ApiPropertyOptional({ example: 150.0, description: 'Quantity required in consumption units' })
+  @Column({ type: 'decimal', precision: 14, scale: 4, nullable: true })
+  quantity?: string | null;
+
+  @ApiPropertyOptional({ example: 'g', description: 'Unit of measure' })
+  @Column({ type: 'varchar', length: 50, name: 'unit_of_measure', nullable: true })
+  unitOfMeasure?: string | null;
 
   @ApiProperty({
     example: 2,

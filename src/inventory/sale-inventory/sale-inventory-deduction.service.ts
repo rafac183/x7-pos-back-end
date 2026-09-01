@@ -20,10 +20,10 @@ import { CashDrawer } from 'src/restaurant-operations/cashdrawer/cash-drawers/en
 import type { OrderFullyPaidPayload } from './order-paid.events';
 import { StockLevelMonitorService } from '../stock-alerts/stock-level-monitor.service';
 
-type SupplyKey = `${number}:${number}`;
+type SupplyKey = string;
 
 function supplyKey(productId: number, variantId: number): SupplyKey {
-  return `${productId}:${variantId}`;
+  return `product:${productId}:${variantId}`;
 }
 
 function pickRecipeForLine(
@@ -80,7 +80,7 @@ export class SaleInventoryDeductionService {
 
       const merchant = await queryRunner.manager.findOne(Merchant, {
         where: { id: order.merchant_id },
-        select: ['id', 'defaultSalesStockLocationId'],
+        select: ['id', 'defaultSalesStockLocationId', 'companyId'],
       });
       const locationId = merchant?.defaultSalesStockLocationId ?? null;
       if (locationId == null) {
@@ -139,7 +139,7 @@ export class SaleInventoryDeductionService {
             merchantId: order.merchant_id,
             finishedProductId: In(productIds),
           },
-          relations: ['lines', 'lines.supplyVariant'],
+          relations: ['lines', 'lines.supplyVariant', 'lines.rawMaterial'],
         });
         for (const r of allRecipes) {
           const list = recipesByProduct.get(r.finishedProductId) ?? [];
@@ -168,16 +168,26 @@ export class SaleInventoryDeductionService {
           ) {
             continue;
           }
-          const per = Number(row.quantityPerSoldUnit);
-          const units = stockIncrementsForRecipeLine(
-            per,
-            row.quantityUnit,
-            soldQty,
-            row.supplyVariant?.stockBasisKind,
-            row.supplyVariant?.baseUnitsPerStockIncrement,
-          );
-          const key = supplyKey(row.supplyProductId, row.supplyVariantId);
-          aggregated.set(key, (aggregated.get(key) ?? 0) + units);
+
+          if (row.rawMaterialId) {
+            // Raw material line
+            const per = Number(row.quantity) || Number(row.quantityPerSoldUnit) || 0;
+            const units = Math.round(soldQty * per);
+            const key = `supply:${row.rawMaterialId}`;
+            aggregated.set(key, (aggregated.get(key) ?? 0) + units);
+          } else {
+            // Legacy product/variant line
+            const per = Number(row.quantityPerSoldUnit);
+            const units = stockIncrementsForRecipeLine(
+              per,
+              row.quantityUnit,
+              soldQty,
+              row.supplyVariant?.stockBasisKind,
+              row.supplyVariant?.baseUnitsPerStockIncrement,
+            );
+            const key = supplyKey(row.supplyProductId as number, row.supplyVariantId as number);
+            aggregated.set(key, (aggregated.get(key) ?? 0) + units);
+          }
         }
       }
 
@@ -191,26 +201,49 @@ export class SaleInventoryDeductionService {
         if (needQty <= 0) {
           continue;
         }
-        const [productIdStr, variantIdStr] = key.split(':');
-        const supplyProductId = Number(productIdStr);
-        const supplyVariantId = Number(variantIdStr);
 
-        const stockItem = await queryRunner.manager
-          .createQueryBuilder(Item, 'item')
-          .innerJoin('item.product', 'product')
-          .where('item.productId = :supplyProductId', { supplyProductId })
-          .andWhere('item.variantId = :supplyVariantId', { supplyVariantId })
-          .andWhere('item.locationId = :locationId', { locationId })
-          .andWhere('item.isActive = :ia', { ia: true })
-          .andWhere('product.merchantId = :merchantId', {
-            merchantId: order.merchant_id,
-          })
-          .getOne();
+        let stockItem: Item | null = null;
 
-        if (!stockItem) {
-          throw new Error(
-            `No active stock item for supply productId=${supplyProductId} variantId=${supplyVariantId} at locationId=${locationId} (orderId=${orderId})`,
-          );
+        if (key.startsWith('supply:')) {
+          const supplyId = Number(key.split(':')[1]);
+          stockItem = await queryRunner.manager
+            .createQueryBuilder(Item, 'item')
+            .innerJoin('item.supply', 'supply')
+            .where('item.supplyId = :supplyId', { supplyId })
+            .andWhere('item.locationId = :locationId', { locationId })
+            .andWhere('item.isActive = :ia', { ia: true })
+            .andWhere('supply.company_id = :companyId', {
+              companyId: merchant?.companyId,
+            })
+            .getOne();
+
+          if (!stockItem) {
+            throw new Error(
+              `No active stock item for raw material supplyId=${supplyId} at locationId=${locationId} (orderId=${orderId})`,
+            );
+          }
+        } else {
+          const parts = key.split(':');
+          const supplyProductId = Number(parts[1]);
+          const supplyVariantId = Number(parts[2]);
+
+          stockItem = await queryRunner.manager
+            .createQueryBuilder(Item, 'item')
+            .innerJoin('item.product', 'product')
+            .where('item.productId = :supplyProductId', { supplyProductId })
+            .andWhere('item.variantId = :supplyVariantId', { supplyVariantId })
+            .andWhere('item.locationId = :locationId', { locationId })
+            .andWhere('item.isActive = :ia', { ia: true })
+            .andWhere('product.merchantId = :merchantId', {
+              merchantId: order.merchant_id,
+            })
+            .getOne();
+
+          if (!stockItem) {
+            throw new Error(
+              `No active stock item for supply productId=${supplyProductId} variantId=${supplyVariantId} at locationId=${locationId} (orderId=${orderId})`,
+            );
+          }
         }
 
         const dec = await queryRunner.manager
@@ -224,8 +257,9 @@ export class SaleInventoryDeductionService {
           .execute();
 
         if (!dec.affected) {
+          const label = key.startsWith('supply:') ? `raw material supplyId=${key.split(':')[1]}` : `productId=${key.split(':')[1]} variantId=${key.split(':')[2]}`;
           throw new Error(
-            `Insufficient stock for productId=${supplyProductId} variantId=${supplyVariantId} at locationId=${locationId} need=${needQty} (orderId=${orderId})`,
+            `Insufficient stock for ${label} at locationId=${locationId} need=${needQty} (orderId=${orderId})`,
           );
         }
 

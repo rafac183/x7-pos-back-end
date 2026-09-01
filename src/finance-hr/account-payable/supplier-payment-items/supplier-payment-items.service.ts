@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { SupplierPaymentItem } from './entities/supplier-payment-item.entity';
 import { SupplierPayment } from '../supplier-payments/entities/supplier-payment.entity';
+import { SupplierPaymentStatus } from '../supplier-payments/constants/supplier-payment-status.enum';
 import { CreateSupplierPaymentItemDto } from './dto/create-supplier-payment-item.dto';
 import { UpdateSupplierPaymentItemDto } from './dto/update-supplier-payment-item.dto';
 import {
@@ -61,11 +62,72 @@ export class SupplierPaymentItemsService {
     return payment;
   }
 
+  /**
+   * Posted Payment Immobility Lock: once a payment is posted, fully allocated, voided,
+   * or has any allocated amount, its breakdown items are frozen.
+   */
+  private assertPaymentMutable(payment: SupplierPayment): void {
+    const frozenStatuses: SupplierPaymentStatus[] = [
+      SupplierPaymentStatus.POSTED,
+      SupplierPaymentStatus.FULLY_ALLOCATED,
+      SupplierPaymentStatus.CANCELLED,
+    ];
+    if (
+      frozenStatuses.includes(payment.status) ||
+      Number(payment.allocated_amount) > 0
+    ) {
+      throw new BadRequestException(
+        'Payment items cannot be modified: the parent payment voucher is posted, allocated, or voided.',
+      );
+    }
+  }
+
+  /** Sum of the payment's live items, optionally excluding the item being updated. */
+  private async sumActiveItems(
+    paymentId: number,
+    excludeItemId?: number,
+  ): Promise<number> {
+    const qb = this.itemRepo
+      .createQueryBuilder('spi')
+      .select('COALESCE(SUM(spi.amount), 0)', 'sum')
+      .where('spi.payment_id = :paymentId', { paymentId })
+      .andWhere('spi.deleted_at IS NULL');
+    if (excludeItemId != null) {
+      qb.andWhere('spi.id <> :excludeItemId', { excludeItemId });
+    }
+    const raw = await qb.getRawOne<{ sum: string }>();
+    return Number(raw?.sum ?? 0);
+  }
+
+  /**
+   * Parent Amount Enforcement: the sum of a payment's items can never exceed the
+   * parent voucher total. Uses a cent-level tolerance to survive decimal rounding.
+   */
+  private async assertWithinPaymentTotal(
+    payment: SupplierPayment,
+    incomingAmount: number,
+    excludeItemId?: number,
+  ): Promise<void> {
+    const others = await this.sumActiveItems(payment.id, excludeItemId);
+    const projected = others + incomingAmount;
+    const total = Number(payment.total_amount);
+    if (projected > total + 0.001) {
+      throw new BadRequestException(
+        `The total amount of payment items ($${projected.toFixed(2)}) cannot exceed the parent payment voucher total ($${total.toFixed(2)}).`,
+      );
+    }
+  }
+
   async create(
     dto: CreateSupplierPaymentItemDto,
     scopedCompanyId?: number,
   ): Promise<OneSupplierPaymentItemResponseDto> {
-    await this.assertPaymentExists(dto.payment_id, scopedCompanyId);
+    const payment = await this.assertPaymentExists(
+      dto.payment_id,
+      scopedCompanyId,
+    );
+    this.assertPaymentMutable(payment);
+    await this.assertWithinPaymentTotal(payment, Number(dto.amount));
 
     const row = this.itemRepo.create({
       payment_id: dto.payment_id,
@@ -185,10 +247,19 @@ export class SupplierPaymentItemsService {
       );
     }
     // Scope guard: the item's payment must belong to the user's company.
-    await this.assertPaymentExists(item.payment_id, scopedCompanyId);
+    const currentPayment = await this.assertPaymentExists(
+      item.payment_id,
+      scopedCompanyId,
+    );
+    this.assertPaymentMutable(currentPayment);
 
-    if (dto.payment_id != null) {
-      await this.assertPaymentExists(dto.payment_id, scopedCompanyId);
+    let targetPayment = currentPayment;
+    if (dto.payment_id != null && dto.payment_id !== item.payment_id) {
+      targetPayment = await this.assertPaymentExists(
+        dto.payment_id,
+        scopedCompanyId,
+      );
+      this.assertPaymentMutable(targetPayment);
       item.payment_id = dto.payment_id;
     }
     if (dto.document_number != null) {
@@ -200,6 +271,13 @@ export class SupplierPaymentItemsService {
     if (dto.amount != null) {
       item.amount = dto.amount as any;
     }
+
+    // Re-check the parent sum with the item's new amount, excluding its own current row.
+    await this.assertWithinPaymentTotal(
+      targetPayment,
+      Number(item.amount),
+      item.id,
+    );
 
     const saved = await this.itemRepo.save(item);
     return {
@@ -226,7 +304,11 @@ export class SupplierPaymentItemsService {
       );
     }
     // Scope guard: the item's payment must belong to the user's company.
-    await this.assertPaymentExists(item.payment_id, scopedCompanyId);
+    const payment = await this.assertPaymentExists(
+      item.payment_id,
+      scopedCompanyId,
+    );
+    this.assertPaymentMutable(payment);
 
     item.deleted_at = new Date();
     await this.itemRepo.save(item);

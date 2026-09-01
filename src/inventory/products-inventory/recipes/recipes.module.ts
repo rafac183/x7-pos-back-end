@@ -10,8 +10,10 @@ import { PurchaseOrderItem } from '../purchase-order-item/entities/purchase-orde
 import { Item } from '../stocks/items/entities/item.entity';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 import { RecipesController } from './recipes.controller';
+import { RecipesV1Controller } from './recipes-v1.controller';
 import { RecipesService } from './recipes.service';
 import { RecipeTheoreticalCostService } from './recipe-theoretical-cost.service';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
 
 @Module({
   imports: [
@@ -25,9 +27,10 @@ import { RecipeTheoreticalCostService } from './recipe-theoretical-cost.service'
       PurchaseOrderItem,
       Item,
       Merchant,
+      Supply,
     ]),
   ],
-  controllers: [RecipesController],
+  controllers: [RecipesController, RecipesV1Controller],
   providers: [RecipesService, RecipeTheoreticalCostService],
   exports: [RecipesService, RecipeTheoreticalCostService],
 })

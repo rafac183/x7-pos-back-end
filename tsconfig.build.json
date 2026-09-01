@@ -12,6 +12,7 @@
     "baseUrl": "./",
     "ignoreDeprecations": "5.0",
     "strictPropertyInitialization": false,
+
     "incremental": false,
     "strict": true,
     "skipLibCheck": true,

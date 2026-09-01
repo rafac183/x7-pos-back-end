@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ArrayNotEmpty, IsArray, IsInt, Min } from 'class-validator';
 
-export class SetInputSuppliersDto {
+export class SetSupplySuppliersDto {
   @ApiProperty({ example: [1, 2, 3], description: 'Supplier IDs to associate' })
   @IsArray()
   @ArrayNotEmpty()

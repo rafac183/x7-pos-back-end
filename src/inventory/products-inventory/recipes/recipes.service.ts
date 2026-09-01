@@ -20,6 +20,10 @@ import { RecipeLineType } from './constants/recipe-line-type.enum';
 import { RecipeTheoreticalCostService } from './recipe-theoretical-cost.service';
 import { UpsertProductRecipeDto } from './dto/upsert-product-recipe.dto';
 import { RecipeLineInputDto } from './dto/recipe-line-input.dto';
+import { CreateRecipeV1Dto } from './dto/create-recipe-v1.dto';
+import { UpdateRecipeV1Dto } from './dto/update-recipe-v1.dto';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 
 @Injectable()
 export class RecipesService {
@@ -27,6 +31,22 @@ export class RecipesService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly recipeTheoreticalCostService: RecipeTheoreticalCostService,
   ) {}
+
+  async findAllForMerchant(merchantId: number): Promise<ProductRecipe[]> {
+    return this.dataSource.manager.find(ProductRecipe, {
+      where: { merchantId },
+      relations: [
+        'finishedProduct',
+        'finishedVariant',
+        'lines',
+        'lines.rawMaterial',
+        'lines.supplyProduct',
+        'lines.supplyVariant',
+        'lines.modifier',
+      ],
+      order: { id: 'DESC' },
+    });
+  }
 
   async findAllForProduct(
     merchantId: number,
@@ -39,6 +59,7 @@ export class RecipesService {
       order: { id: 'ASC' },
     });
   }
+
 
   async create(
     merchantId: number,
@@ -359,5 +380,223 @@ export class RecipesService {
       { id: recipeId },
       { theoreticalCostCached: cached },
     );
+  }
+
+  // --- V1 RECIPES METHODS ---
+
+  async findRecipeForProduct(
+    merchantId: number,
+    productId: number,
+  ): Promise<ProductRecipe[]> {
+    await this.assertProductOwned(merchantId, productId);
+    return this.dataSource.manager.find(ProductRecipe, {
+      where: { merchantId, finishedProductId: productId },
+      relations: ['lines', 'lines.modifier', 'lines.rawMaterial'],
+      order: { id: 'ASC' },
+    });
+  }
+
+  async createRecipeV1(
+    merchantId: number,
+    dto: CreateRecipeV1Dto,
+  ): Promise<ProductRecipe> {
+    const finishedVariantId = dto.variantId ?? null;
+    await this.assertProductOwned(merchantId, dto.productId);
+    await this.assertNoDuplicateRecipeHeader(
+      merchantId,
+      dto.productId,
+      finishedVariantId,
+      null,
+    );
+    if (finishedVariantId != null) {
+      await this.assertVariantBelongsToProduct(
+        merchantId,
+        dto.productId,
+        finishedVariantId,
+      );
+    }
+    await this.validateRawMaterials(merchantId, dto.lines);
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const recipe = queryRunner.manager.create(ProductRecipe, {
+        merchantId,
+        finishedProductId: dto.productId,
+        finishedVariantId,
+        theoreticalCostCached: null,
+      });
+      const saved = await queryRunner.manager.save(ProductRecipe, recipe);
+
+      // Create lines
+      const lineEntities = dto.lines.map((l) =>
+        queryRunner.manager.create(ProductRecipeLine, {
+          recipeId: saved.id,
+          lineType: RecipeLineType.REQUIRED,
+          rawMaterialId: l.raw_material_id,
+          quantity: l.quantity.toString(),
+          unitOfMeasure: l.unit_of_measure,
+          quantityPerSoldUnit: l.quantity.toString(), // keep compatibility
+        }),
+      );
+      await queryRunner.manager.save(ProductRecipeLine, lineEntities);
+
+      await this.refreshTheoreticalCost(
+        queryRunner.manager,
+        merchantId,
+        saved.id,
+      );
+      await queryRunner.commitTransaction();
+
+      return this.dataSource.manager.findOneOrFail(ProductRecipe, {
+        where: { id: saved.id },
+        relations: ['lines', 'lines.modifier', 'lines.rawMaterial'],
+      });
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async updateRecipeV1(
+    merchantId: number,
+    recipeId: number,
+    dto: UpdateRecipeV1Dto,
+  ): Promise<ProductRecipe> {
+    const existing = await this.dataSource.manager.findOne(ProductRecipe, {
+      where: { id: recipeId, merchantId },
+    });
+    if (!existing) {
+      throw new NotFoundException('Recipe not found');
+    }
+
+    const finishedVariantId = dto.variantId ?? null;
+    await this.assertNoDuplicateRecipeHeader(
+      merchantId,
+      existing.finishedProductId,
+      finishedVariantId,
+      recipeId,
+    );
+    if (finishedVariantId != null) {
+      await this.assertVariantBelongsToProduct(
+        merchantId,
+        existing.finishedProductId,
+        finishedVariantId,
+      );
+    }
+    await this.validateRawMaterials(merchantId, dto.lines);
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      existing.finishedVariantId = finishedVariantId;
+      await queryRunner.manager.save(ProductRecipe, existing);
+
+      // Replace lines
+      await queryRunner.manager.delete(ProductRecipeLine, { recipeId });
+      const lineEntities = dto.lines.map((l) =>
+        queryRunner.manager.create(ProductRecipeLine, {
+          recipeId,
+          lineType: RecipeLineType.REQUIRED,
+          rawMaterialId: l.raw_material_id,
+          quantity: l.quantity.toString(),
+          unitOfMeasure: l.unit_of_measure,
+          quantityPerSoldUnit: l.quantity.toString(), // keep compatibility
+        }),
+      );
+      await queryRunner.manager.save(ProductRecipeLine, lineEntities);
+
+      await this.refreshTheoreticalCost(
+        queryRunner.manager,
+        merchantId,
+        recipeId,
+      );
+      await queryRunner.commitTransaction();
+
+      return this.dataSource.manager.findOneOrFail(ProductRecipe, {
+        where: { id: recipeId },
+        relations: ['lines', 'lines.modifier', 'lines.rawMaterial'],
+      });
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async removeRecipeOrLine(
+    merchantId: number,
+    recipeId: number,
+    lineItemId?: number,
+  ): Promise<void> {
+    const recipe = await this.dataSource.manager.findOne(ProductRecipe, {
+      where: { id: recipeId, merchantId },
+    });
+    if (!recipe) {
+      throw new NotFoundException('Recipe not found');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      if (lineItemId != null) {
+        // Remove specific line item
+        const res = await queryRunner.manager.delete(ProductRecipeLine, {
+          id: lineItemId,
+          recipeId,
+        });
+        if (!res.affected) {
+          throw new NotFoundException('Recipe line item not found');
+        }
+        await this.refreshTheoreticalCost(
+          queryRunner.manager,
+          merchantId,
+          recipeId,
+        );
+      } else {
+        // Remove entire recipe
+        await queryRunner.manager.delete(ProductRecipe, { id: recipeId });
+      }
+      await queryRunner.commitTransaction();
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  private async validateRawMaterials(
+    merchantId: number,
+    lines: { raw_material_id: number }[],
+  ): Promise<void> {
+    const merchant = await this.dataSource.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+    if (!merchant?.companyId) {
+      throw new BadRequestException(
+        'Merchant is not associated with a company',
+      );
+    }
+    const companyId = merchant.companyId;
+    const rawMaterialIds = [...new Set(lines.map((l) => l.raw_material_id))];
+
+    if (rawMaterialIds.length > 0) {
+      const supplies = await this.dataSource.manager.find(Supply, {
+        where: { id: In(rawMaterialIds), company_id: companyId, isActive: true },
+      });
+      if (supplies.length !== rawMaterialIds.length) {
+        throw new BadRequestException(
+          'One or more raw materials were not found or are inactive for this company',
+        );
+      }
+    }
   }
 }

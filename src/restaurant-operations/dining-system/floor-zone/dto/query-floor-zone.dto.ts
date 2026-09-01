@@ -11,7 +11,7 @@ export class QueryFloorZoneDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(['active', 'inactive', 'deleted'])
+  @IsIn(['active', 'inactive', 'draft', 'archived', 'deleted'])
   status?: string;
 
   @ApiPropertyOptional({

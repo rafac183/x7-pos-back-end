@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
@@ -19,6 +19,8 @@ import { Location } from '../locations/entities/location.entity';
 import { ProductLittleResponseDto } from '../../products/dto/product-response.dto';
 import { VariantLittleResponseDto } from '../../variants/dto/variant-response.dto';
 import { StockLevelMonitorService } from '../../../stock-alerts/stock-level-monitor.service';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 
 @Injectable()
 export class ItemsService {
@@ -31,6 +33,8 @@ export class ItemsService {
     private readonly locationRepository: Repository<Location>,
     @InjectRepository(Variant)
     private readonly variantRepository: Repository<Variant>,
+    @InjectRepository(Supply)
+    private readonly supplyRepository: Repository<Supply>,
     private readonly movementsService: MovementsService,
     private readonly stockLevelMonitor: StockLevelMonitorService,
   ) {}
@@ -39,53 +43,99 @@ export class ItemsService {
     merchant_id: number,
     createItemDto: CreateItemDto,
   ): Promise<OneItemResponse> {
-    const { productId, locationId, variantId, currentQty, minimumQty } =
+    const { productId, locationId, variantId, supplyId, currentQty, minimumQty } =
       createItemDto;
     const merchantId = merchant_id;
 
-    const [product, variant, location] = await Promise.all([
-      this.productRepository.findOneBy({
-        id: productId,
-        isActive: true,
-        merchantId: merchant_id,
-      }),
-      this.variantRepository.findOneBy({
-        id: variantId,
-        isActive: true,
-        product: { id: productId, merchantId: merchant_id },
-      }),
-      this.locationRepository.findOneBy({
-        id: locationId,
-        isActive: true,
-        merchantId: merchant_id,
-      }),
-    ]);
-
-    if (!product) {
-      ErrorHandler.notFound(ErrorMessage.PRODUCT_NOT_FOUND);
+    if (!supplyId && (!productId || !variantId)) {
+      throw new BadRequestException(
+        'Must provide either supplyId OR both productId and variantId',
+      );
     }
+
+    const location = await this.locationRepository.findOneBy({
+      id: locationId,
+      isActive: true,
+      merchantId: merchant_id,
+    });
     if (!location) {
       ErrorHandler.notFound(ErrorMessage.LOCATION_NOT_FOUND);
     }
-    if (!variant) {
-      ErrorHandler.notFound(ErrorMessage.VARIANT_NOT_FOUND);
-    }
 
-    const existingItem = await this.itemRepository.findOne({
-      where: {
-        product: { id: productId },
-        location: { id: locationId },
-        variant: { id: variant.id },
-      },
-    });
+    let product: Product | null = null;
+    let variant: Variant | null = null;
+    let supply: Supply | null = null;
 
-    if (existingItem) {
-      if (existingItem.isActive) {
-        ErrorHandler.exists(ErrorMessage.ITEM_EXISTS);
-      } else {
-        existingItem.isActive = true;
-        const activatedItem = await this.itemRepository.save(existingItem);
-        return this.findOne(activatedItem.id, merchantId, 'Created');
+    if (supplyId) {
+      // Buscar insumo asociado a la compañía del merchant
+      const merchant = await this.locationRepository.manager.findOne(Merchant, {
+        where: { id: merchant_id },
+        select: ['companyId'],
+      });
+      supply = await this.supplyRepository.findOneBy({
+        id: supplyId,
+        isActive: true,
+        company_id: merchant?.companyId,
+      });
+      if (!supply) {
+        throw new NotFoundException('Raw material supply not found or inactive');
+      }
+
+      const existingItem = await this.itemRepository.findOne({
+        where: {
+          supply: { id: supplyId },
+          location: { id: locationId },
+        },
+      });
+
+      if (existingItem) {
+        if (existingItem.isActive) {
+          ErrorHandler.exists('Stock item already exists for this raw material at this location');
+        } else {
+          existingItem.isActive = true;
+          const activatedItem = await this.itemRepository.save(existingItem);
+          return this.findOne(activatedItem.id, merchantId, 'Created');
+        }
+      }
+    } else {
+      const [prod, varnt] = await Promise.all([
+        this.productRepository.findOneBy({
+          id: productId,
+          isActive: true,
+          merchantId: merchant_id,
+        }),
+        this.variantRepository.findOneBy({
+          id: variantId,
+          isActive: true,
+          product: { id: productId, merchantId: merchant_id },
+        }),
+      ]);
+
+      if (!prod) {
+        ErrorHandler.notFound(ErrorMessage.PRODUCT_NOT_FOUND);
+      }
+      if (!varnt) {
+        ErrorHandler.notFound(ErrorMessage.VARIANT_NOT_FOUND);
+      }
+      product = prod;
+      variant = varnt;
+
+      const existingItem = await this.itemRepository.findOne({
+        where: {
+          product: { id: productId },
+          location: { id: locationId },
+          variant: { id: variant.id },
+        },
+      });
+
+      if (existingItem) {
+        if (existingItem.isActive) {
+          ErrorHandler.exists(ErrorMessage.ITEM_EXISTS);
+        } else {
+          existingItem.isActive = true;
+          const activatedItem = await this.itemRepository.save(existingItem);
+          return this.findOne(activatedItem.id, merchantId, 'Created');
+        }
       }
     }
 
@@ -95,6 +145,7 @@ export class ItemsService {
       product,
       location,
       variant,
+      supply,
     });
 
     const savedItem = await this.itemRepository.save(newItem);
@@ -108,25 +159,32 @@ export class ItemsService {
     query: GetItemsQueryDto,
     merchantId: number,
   ): Promise<AllPaginatedItems> {
-    // 1. Configure pagination
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
 
-    // 2. Build query with filters
+    const merchant = await this.locationRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+
     const queryBuilder = this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.variant', 'variant')
       .leftJoinAndSelect('item.location', 'location')
-      .where('product.merchantId = :merchantId', { merchantId })
+      .leftJoinAndSelect('item.supply', 'supply')
+      .where('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('item.isActive = :isActive', { isActive: true });
 
-    // 3. Apply optional filters
     if (query.productName) {
-      queryBuilder.andWhere('LOWER(product.name) LIKE LOWER(:productName)', {
-        productName: `%${query.productName}%`,
-      });
+      queryBuilder.andWhere(
+        '(LOWER(product.name) LIKE LOWER(:productName) OR LOWER(supply.name) LIKE LOWER(:productName))',
+        { productName: `%${query.productName}%` },
+      );
     }
 
     if (query.variantName) {
@@ -135,22 +193,31 @@ export class ItemsService {
       });
     }
 
-    // 4. Get total records
+    if (query.locationId) {
+      queryBuilder.andWhere('item.locationId = :locationId', {
+        locationId: query.locationId,
+      });
+    }
+
+    if (query.supplyId) {
+      queryBuilder.andWhere('item.supplyId = :supplyId', {
+        supplyId: query.supplyId,
+      });
+    }
+
     const total = await queryBuilder.getCount();
 
-    // 5. Apply pagination and sorting
-    const items = await queryBuilder
-      .orderBy('product.name', 'ASC')
-      .skip(skip)
-      .take(limit)
+    const allItems = await queryBuilder
+      .addSelect('COALESCE(product.name, supply.name)', 'itemName')
+      .orderBy('"itemName"', 'ASC')
       .getMany();
 
-    // 6. Calculate pagination metadata
+    const items = allItems.slice(skip, skip + limit);
+
     const totalPages = Math.ceil(total / limit);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
-    // 7. Map to ItemResponseDto
     const data: ItemResponseDto[] = items.map((item) => {
       const result: ItemResponseDto = {
         id: item.id,
@@ -172,6 +239,14 @@ export class ItemsService {
               id: item.variant.id,
               name: item.variant.name,
             } as VariantLittleResponseDto)
+          : null,
+        supply: item.supply
+          ? {
+              id: item.supply.id,
+              name: item.supply.name,
+              code: item.supply.code,
+              sku: item.supply.sku,
+            }
           : null,
         location: item.location
           ? ({
@@ -204,28 +279,35 @@ export class ItemsService {
     if (!id || id <= 0) {
       ErrorHandler.invalidId('Item ID is incorrect');
     }
-    const whereCondition: {
-      id: number;
-      merchantId?: number;
-      isActive: boolean;
-    } = {
-      id,
-      isActive: createdUpdateDelete === 'Deleted' ? false : true,
-    };
+
+    let companyId: number | undefined;
     if (merchantId !== undefined) {
-      whereCondition.merchantId = merchantId;
+      const merchant = await this.locationRepository.manager.findOne(Merchant, {
+        where: { id: merchantId },
+        select: ['companyId'],
+      });
+      companyId = merchant?.companyId;
     }
-    const item = await this.itemRepository
+
+    const queryBuilder = this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.variant', 'variant')
       .leftJoinAndSelect('item.location', 'location')
+      .leftJoinAndSelect('item.supply', 'supply')
       .where('item.id = :id', { id })
-      .andWhere('product.merchantId = :merchantId', { merchantId })
       .andWhere('item.isActive = :isActive', {
-        isActive: whereCondition.isActive,
-      })
-      .getOne();
+        isActive: createdUpdateDelete === 'Deleted' ? false : true,
+      });
+
+    if (merchantId !== undefined) {
+      queryBuilder.andWhere(
+        '(product.merchantId = :merchantId OR supply.company_id = :companyId)',
+        { merchantId, companyId },
+      );
+    }
+
+    const item = await queryBuilder.getOne();
 
     if (!item) {
       ErrorHandler.notFound(ErrorMessage.ITEM_NOT_FOUND);
@@ -251,6 +333,14 @@ export class ItemsService {
             id: item.variant.id,
             name: item.variant.name,
           } as VariantLittleResponseDto)
+        : null,
+      supply: item.supply
+        ? {
+            id: item.supply.id,
+            name: item.supply.name,
+            code: item.supply.code,
+            sku: item.supply.sku,
+          }
         : null,
       location: item.location
         ? ({
@@ -304,16 +394,25 @@ export class ItemsService {
       ErrorHandler.invalidId('Item ID is incorrect');
     }
     const merchantId = merchant_id;
-    const { productId, locationId, variantId, currentQty, minimumQty } =
+    const { productId, locationId, variantId, supplyId, currentQty, minimumQty } =
       updateItemDto;
+
+    const merchant = await this.locationRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
 
     const existingItem = await this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.location', 'location')
       .leftJoinAndSelect('item.variant', 'variant')
+      .leftJoinAndSelect('item.supply', 'supply')
       .where('item.id = :id', { id })
-      .andWhere('product.merchantId = :merchantId', { merchantId })
+      .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('item.isActive = :isActive', { isActive: true })
       .getOne();
 
@@ -323,38 +422,47 @@ export class ItemsService {
 
     const oldLocation = existingItem.location;
 
-    const [product, variant, location] = await Promise.all([
-      this.productRepository.findOneBy({
-        id: productId,
-        isActive: true,
-        merchantId: merchant_id,
-      }),
-      this.variantRepository.findOneBy({
-        id: variantId,
-        productId: productId,
-        isActive: true,
-        product: { id: productId, merchantId: merchant_id },
-      }),
-      this.locationRepository.findOneBy({
+    if (locationId) {
+      const location = await this.locationRepository.findOneBy({
         id: locationId,
         isActive: true,
         merchantId: merchant_id,
-      }),
-    ]);
-
-    if (!product) {
-      ErrorHandler.notFound(ErrorMessage.PRODUCT_NOT_FOUND);
-    }
-    if (!location) {
-      ErrorHandler.notFound(ErrorMessage.LOCATION_NOT_FOUND);
-    }
-    if (!variant) {
-      ErrorHandler.notFound(ErrorMessage.VARIANT_NOT_FOUND);
+      });
+      if (!location) ErrorHandler.notFound(ErrorMessage.LOCATION_NOT_FOUND);
+      existingItem.location = location;
     }
 
-    existingItem.product = product;
-    existingItem.location = location;
-    existingItem.variant = variant;
+    if (supplyId) {
+      const supply = await this.supplyRepository.findOneBy({
+        id: supplyId,
+        isActive: true,
+        company_id: merchant?.companyId,
+      });
+      if (!supply) throw new NotFoundException('Supply not found');
+      existingItem.supply = supply;
+      existingItem.product = null;
+      existingItem.variant = null;
+    } else if (productId && variantId) {
+      const [product, variant] = await Promise.all([
+        this.productRepository.findOneBy({
+          id: productId,
+          isActive: true,
+          merchantId: merchant_id,
+        }),
+        this.variantRepository.findOneBy({
+          id: variantId,
+          productId: productId,
+          isActive: true,
+          product: { id: productId, merchantId: merchant_id },
+        }),
+      ]);
+      if (!product) ErrorHandler.notFound(ErrorMessage.PRODUCT_NOT_FOUND);
+      if (!variant) ErrorHandler.notFound(ErrorMessage.VARIANT_NOT_FOUND);
+
+      existingItem.product = product;
+      existingItem.variant = variant;
+      existingItem.supply = null;
+    }
 
     if (currentQty !== undefined) {
       existingItem.currentQty = currentQty;
@@ -365,8 +473,7 @@ export class ItemsService {
 
     const updatedItem = await this.itemRepository.save(existingItem);
 
-    if (oldLocation.id !== updatedItem.location.id) {
-      // Create an OUT movement from the old location
+    if (locationId && oldLocation.id !== updatedItem.location.id) {
       await this.movementsService.create(merchantId, {
         stockItemId: updatedItem.id,
         quantity: updatedItem.currentQty,
@@ -375,7 +482,6 @@ export class ItemsService {
         reason: 'Transfer between stock locations',
       });
 
-      // Create an IN movement to the new location
       await this.movementsService.create(merchantId, {
         stockItemId: updatedItem.id,
         quantity: updatedItem.currentQty,
@@ -398,11 +504,20 @@ export class ItemsService {
     }
     const merchantId = merchant_id;
 
+    const merchant = await this.locationRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+
     const item = await this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.supply', 'supply')
       .where('item.id = :id', { id })
-      .andWhere('product.merchantId = :merchantId', { merchantId })
+      .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('item.isActive = :isActive', { isActive: true })
       .getOne();
 
@@ -431,7 +546,7 @@ export class ItemsService {
     if (items.length > 0) {
       for (const item of items) {
         item.isActive = false;
-        item.currentQty = 0; // Eliminar existencias al desactivar
+        item.currentQty = 0;
       }
       await this.itemRepository.save(items);
     }
@@ -444,13 +559,22 @@ export class ItemsService {
   ): Promise<OneItemResponse> {
     const { value, type, reason } = adjustStockDto;
 
+    const merchant = await this.locationRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+
     const item = await this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.variant', 'variant')
       .leftJoinAndSelect('item.location', 'location')
+      .leftJoinAndSelect('item.supply', 'supply')
       .where('item.id = :id', { id })
-      .andWhere('product.merchantId = :merchantId', { merchantId })
+      .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('item.isActive = :isActive', { isActive: true })
       .getOne();
 
@@ -473,7 +597,6 @@ export class ItemsService {
     item.currentQty = newQty;
     const savedItem = await this.itemRepository.save(item);
 
-    // Registrar auditoría automática en stock_movement si la diferencia no es 0
     if (diff !== 0) {
       await this.movementsService.create(merchantId, {
         stockItemId: item.id,

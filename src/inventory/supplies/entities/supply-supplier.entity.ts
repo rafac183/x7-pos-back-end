@@ -6,18 +6,18 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Input } from './input.entity';
+import { Supply } from './supply.entity';
 import { Supplier } from 'src/core/business-partners/suppliers/entities/supplier.entity';
 
-@Entity('input_suppliers')
-@Index(['input', 'supplier'], { unique: true })
-export class InputSupplier {
+@Entity('supply_suppliers')
+@Index(['supply', 'supplier'], { unique: true })
+export class SupplySupplier {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Input, (input) => input.suppliers, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'input_id' })
-  input: Input;
+  @ManyToOne(() => Supply, (supply) => supply.suppliers, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'supply_id' })
+  supply: Supply;
 
   @ManyToOne(() => Supplier, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({ name: 'supplier_id' })

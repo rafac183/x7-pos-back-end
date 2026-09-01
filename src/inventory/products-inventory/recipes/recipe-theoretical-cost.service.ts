@@ -12,6 +12,8 @@ import {
   recipeQuantityToCanonicalPerSoldUnit,
 } from './utils/recipe-unit-conversion.util';
 
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+
 const PO_STATUSES_FOR_COST: PurchaseOrderStatus[] = [
   PurchaseOrderStatus.COMPLETED,
   PurchaseOrderStatus.PARTIALLY_RECEIVED,
@@ -54,7 +56,10 @@ export class RecipeTheoreticalCostService {
       return null;
     }
 
-    const variantIds = [...new Set(baseLines.map((l) => l.supplyVariantId))];
+    const legacyLines = baseLines.filter((l) => !l.rawMaterialId);
+    const rawMaterialLines = baseLines.filter((l) => !!l.rawMaterialId);
+
+    const variantIds = [...new Set(legacyLines.map((l) => l.supplyVariantId as number))];
     const variants =
       variantIds.length > 0
         ? await manager.find(Variant, { where: { id: In(variantIds) } })
@@ -62,12 +67,14 @@ export class RecipeTheoreticalCostService {
     const variantById = new Map(variants.map((v) => [v.id, v]));
 
     let sum = 0;
-    for (const line of baseLines) {
+
+    // 1. Process legacy product/variant recipe lines
+    for (const line of legacyLines) {
       const per = Number(line.quantityPerSoldUnit);
       if (!Number.isFinite(per)) {
         continue;
       }
-      const variant = variantById.get(line.supplyVariantId);
+      const variant = variantById.get(line.supplyVariantId as number);
       const canonicalPerSold = recipeQuantityToCanonicalPerSoldUnit(
         per,
         line.quantityUnit,
@@ -76,8 +83,8 @@ export class RecipeTheoreticalCostService {
       const moneyPerUnit = await this.resolveSupplyUnitCost(
         manager,
         merchantId,
-        line.supplyProductId,
-        line.supplyVariantId,
+        line.supplyProductId as number,
+        line.supplyVariantId as number,
       );
       if (moneyPerUnit == null || !Number.isFinite(moneyPerUnit)) {
         continue;
@@ -105,10 +112,72 @@ export class RecipeTheoreticalCostService {
       sum += canonicalPerSold * costPerCanonical;
     }
 
+    // 2. Process raw material/supply recipe lines
+    for (const line of rawMaterialLines) {
+      const qty = Number(line.quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        continue;
+      }
+
+      const supply = await manager.findOne(Supply, {
+        where: { id: line.rawMaterialId as number },
+      });
+      if (!supply) {
+        continue;
+      }
+
+      // Resolve unit cost for this supply
+      let unitCost = 0;
+      const wacc = await this.findSupplyStockItemWacc(
+        manager,
+        merchantId,
+        supply.id,
+      );
+      if (wacc !== null) {
+        unitCost = wacc;
+      } else if (supply.cost_per_unit != null) {
+        unitCost = Number(supply.cost_per_unit);
+      }
+
+      const conversionFactor = Number(supply.conversion_factor) || 1;
+      const costPerCanonical = unitCost / conversionFactor;
+
+      sum += qty * costPerCanonical;
+    }
+
     if (!Number.isFinite(sum)) {
       return null;
     }
     return formatCost(sum);
+  }
+
+  private async findSupplyStockItemWacc(
+    manager: EntityManager,
+    merchantId: number,
+    supplyId: number,
+  ): Promise<number | null> {
+    const merchant = await manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['id', 'defaultSalesStockLocationId'],
+    });
+    const locationId = merchant?.defaultSalesStockLocationId;
+    if (locationId == null) {
+      return null;
+    }
+
+    const stockItem = await manager.findOne(Item, {
+      where: {
+        supplyId,
+        locationId,
+        isActive: true,
+      },
+      select: ['id', 'weightedAverageUnitCost'],
+    });
+    if (stockItem?.weightedAverageUnitCost == null) {
+      return null;
+    }
+    const value = Number(stockItem.weightedAverageUnitCost);
+    return Number.isFinite(value) && value >= 0 ? value : null;
   }
 
   private async resolveSupplyUnitCost(

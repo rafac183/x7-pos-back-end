@@ -102,16 +102,25 @@ export class SupplierPaymentAllocationsService {
     });
     if (invoices.length === 0) return;
 
+    // Sum every live invoice allocation pointing at this document, funded by either a
+    // payment or a credit note of this company (LEFT joins — the funding source is a XOR).
     const raw = await this.allocationRepo
       .createQueryBuilder('spa')
-      .innerJoin(
+      .leftJoin(
         SupplierPayment,
         'sp',
-        'sp.id = spa.payment_id AND sp.deleted_at IS NULL AND sp.company_id = :companyId',
-        { companyId },
+        'sp.id = spa.payment_id AND sp.deleted_at IS NULL',
+      )
+      .leftJoin(
+        SupplierCreditNote,
+        'scn',
+        'scn.id = spa.credit_note_id AND scn.deleted_at IS NULL',
       )
       .select('COALESCE(SUM(spa.allocated_amount), 0)', 'sum')
       .where('spa.deleted_at IS NULL')
+      .andWhere('(sp.company_id = :companyId OR scn.company_id = :companyId)', {
+        companyId,
+      })
       .andWhere('spa.supplier_id = :supplierId', { supplierId })
       .andWhere('spa.document_number = :documentNumber', { documentNumber })
       .andWhere('LOWER(spa.document_type) = :docType', { docType: 'invoice' })
@@ -171,24 +180,38 @@ export class SupplierPaymentAllocationsService {
   /**
    * Recompute every aggregate an allocation touches: the payment, the target invoice(s)
    * (for invoice allocations), and the credit note (when the allocation references one).
+   * The funding source is a XOR, so the company for the invoice recompute comes from
+   * whichever side is set — payment for cash allocations, credit note for credit ones.
    */
   private async cascadeAggregates(ref: {
-    payment_id: number;
+    payment_id: number | null;
     supplier_id: number;
     document_number: string;
     document_type: string;
     credit_note_id?: number | null;
   }): Promise<void> {
-    const payment = await this.recomputePayment(ref.payment_id);
-    if (payment && String(ref.document_type).toLowerCase() === 'invoice') {
-      await this.recomputeInvoicesForDocument(
-        payment.company_id,
-        ref.supplier_id,
-        ref.document_number,
-      );
+    let companyId: number | null = null;
+
+    if (ref.payment_id != null) {
+      const payment = await this.recomputePayment(ref.payment_id);
+      companyId = payment?.company_id ?? null;
     }
     if (ref.credit_note_id != null) {
       await this.recomputeCreditNote(ref.credit_note_id);
+      if (companyId == null) {
+        const cn = await this.creditNoteRepo.findOne({
+          where: { id: ref.credit_note_id, deleted_at: IsNull() },
+        });
+        companyId = cn?.company_id ?? null;
+      }
+    }
+
+    if (companyId != null && String(ref.document_type).toLowerCase() === 'invoice') {
+      await this.recomputeInvoicesForDocument(
+        companyId,
+        ref.supplier_id,
+        ref.document_number,
+      );
     }
   }
 
@@ -212,7 +235,30 @@ export class SupplierPaymentAllocationsService {
     current?: SupplierPaymentAllocation,
     scopedCompanyId?: number,
   ): Promise<void> {
-    const paymentId = dto.payment_id ?? current?.payment_id;
+    // Resolve the funding source as it will be AFTER this write, so the XOR guard also
+    // covers partial updates (e.g. clearing payment_id while setting credit_note_id).
+    const paymentId =
+      dto.payment_id !== undefined ? dto.payment_id : current?.payment_id;
+    const creditNoteIdResolved =
+      dto.credit_note_id !== undefined
+        ? dto.credit_note_id
+        : current?.credit_note_id;
+
+    // Mutual exclusion: exactly one funding source — never both, never neither.
+    // Only enforced on creates and on writes that actually touch a source field, so
+    // legacy rows (written when payment_id was mandatory alongside credit_note_id)
+    // stay editable and removable.
+    const touchesSource =
+      dto.payment_id !== undefined || dto.credit_note_id !== undefined;
+    if (
+      (current === undefined || touchesSource) &&
+      (paymentId == null) === (creditNoteIdResolved == null)
+    ) {
+      throw new BadRequestException(
+        'An allocation must be funded by exactly one source: either a payment or a credit note.',
+      );
+    }
+
     if (paymentId != null) {
       const payment = await this.paymentRepo.findOne({
         where: { id: paymentId, deleted_at: IsNull() },
@@ -240,17 +286,23 @@ export class SupplierPaymentAllocationsService {
       }
     }
 
-    const creditNoteId =
-      dto.credit_note_id !== undefined
-        ? dto.credit_note_id
-        : current?.credit_note_id;
-    if (creditNoteId != null) {
+    if (creditNoteIdResolved != null) {
       const creditNote = await this.creditNoteRepo.findOne({
-        where: { id: creditNoteId, deleted_at: IsNull() },
+        where: { id: creditNoteIdResolved, deleted_at: IsNull() },
       });
       if (!creditNote) {
         throw new NotFoundException(
-          `Supplier credit note with ID ${creditNoteId} not found`,
+          `Supplier credit note with ID ${creditNoteIdResolved} not found`,
+        );
+      }
+      // Multi-tenant guard: credit-note-funded allocations have no payment to scope
+      // against, so the credit note itself carries the company check.
+      if (
+        scopedCompanyId != null &&
+        creditNote.company_id !== scopedCompanyId
+      ) {
+        throw new NotFoundException(
+          `Supplier credit note with ID ${creditNoteIdResolved} not found`,
         );
       }
     }
@@ -263,7 +315,7 @@ export class SupplierPaymentAllocationsService {
     await this.validateRelations(dto, undefined, scopedCompanyId);
 
     const row = this.allocationRepo.create({
-      payment_id: dto.payment_id,
+      payment_id: dto.payment_id ?? null,
       credit_note_id: dto.credit_note_id ?? null,
       supplier_id: dto.supplier_id,
       document_number: dto.document_number,
@@ -294,14 +346,23 @@ export class SupplierPaymentAllocationsService {
       .createQueryBuilder('spa')
       .where('spa.deleted_at IS NULL');
 
-    // Multi-tenant guard: merchant users only see allocations of their own company's payments.
+    // Multi-tenant guard: merchant users only see allocations funded by their own
+    // company. LEFT joins on both sides — a credit-note-funded allocation has no
+    // payment_id, and an inner join on the payment would hide it entirely.
     if (scopedCompanyId != null) {
-      qb.innerJoin(
+      qb.leftJoin(
         SupplierPayment,
         'sp',
-        'sp.id = spa.payment_id AND sp.company_id = :companyId',
-        { companyId: scopedCompanyId },
-      );
+        'sp.id = spa.payment_id AND sp.deleted_at IS NULL',
+      )
+        .leftJoin(
+          SupplierCreditNote,
+          'scn',
+          'scn.id = spa.credit_note_id AND scn.deleted_at IS NULL',
+        )
+        .andWhere('(sp.company_id = :companyId OR scn.company_id = :companyId)', {
+          companyId: scopedCompanyId,
+        });
     }
 
     if (query.payment_id != null) {
@@ -401,7 +462,8 @@ export class SupplierPaymentAllocationsService {
       credit_note_id: row.credit_note_id,
     };
 
-    if (dto.payment_id != null) row.payment_id = dto.payment_id;
+    // Both sources accept an explicit null so the funding source can be switched.
+    if (dto.payment_id !== undefined) row.payment_id = dto.payment_id ?? null;
     if (dto.credit_note_id !== undefined)
       row.credit_note_id = dto.credit_note_id ?? null;
     if (dto.supplier_id != null) row.supplier_id = dto.supplier_id;

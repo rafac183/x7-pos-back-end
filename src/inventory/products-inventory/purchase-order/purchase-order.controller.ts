@@ -8,6 +8,9 @@ import {
   Delete,
   Query,
   UseGuards,
+  Put,
+  ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
@@ -16,6 +19,7 @@ import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-f
 import { PurchaseOrderService } from './purchase-order.service';
 import { CreatePurchaseOrderDto } from './dto/create-purchase-order.dto';
 import { UpdatePurchaseOrderDto } from './dto/update-purchase-order.dto';
+import { ReceiveItemsDto } from './dto/receive-items.dto';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -42,7 +46,7 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 
 @ApiExtraModels(ErrorResponse)
 @ApiBearerAuth()
-@Controller('purchase-order')
+@Controller('v1/purchase-orders')
 @RequireFeature(SUBSCRIPTION_FEATURE_IDS.PURCHASE_ORDERS_MANAGEMENT)
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 export class PurchaseOrderController {
@@ -565,5 +569,49 @@ export class PurchaseOrderController {
   ) {
     const merchantId = user.merchant.id;
     return this.purchaseOrderService.remove(+id, merchantId);
+  }
+
+  @Put(':id')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB, Scope.MERCHANT_ANDROID, Scope.MERCHANT_IOS)
+  @ApiOperation({ summary: 'Update PO details or item quantities (allowed only in DRAFT or SENT states)' })
+  async updateFull(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdatePurchaseOrderDto,
+  ) {
+    const merchantId = user.merchant.id;
+    return this.purchaseOrderService.update(id, merchantId, dto);
+  }
+
+  @Patch(':id/status')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB, Scope.MERCHANT_ANDROID, Scope.MERCHANT_IOS)
+  @ApiOperation({ summary: 'Change PO lifecycle status' })
+  async updateStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: PurchaseOrderStatus },
+  ) {
+    const merchantId = user.merchant.id;
+    if (!body.status) {
+      throw new BadRequestException('Status is required');
+    }
+    return this.purchaseOrderService.update(id, merchantId, {
+      status: body.status,
+    });
+  }
+
+  @Post(':id/receive')
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(Scope.MERCHANT_WEB, Scope.MERCHANT_ANDROID, Scope.MERCHANT_IOS)
+  @ApiOperation({ summary: 'Receive full or partial items, updating stock balances and logging inventory movements' })
+  async receiveItems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReceiveItemsDto,
+  ) {
+    const merchantId = user.merchant.id;
+    return this.purchaseOrderService.receiveOrderItems(id, merchantId, dto, user.email);
   }
 }

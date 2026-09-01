@@ -8,14 +8,26 @@ export class CreateLocationDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ example: '123 Main St', description: 'Location address' })
+  @ApiProperty({ example: 'MAIN-01', description: 'Location code', required: false })
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
+  @MaxLength(50)
+  code?: string;
+
+  @ApiProperty({ example: '123 Main St', description: 'Location address', required: false })
+  @IsString()
+  @IsOptional()
   @MaxLength(255)
-  address: string;
+  address?: string;
+
+  @ApiProperty({ example: true, description: 'Is main storage hub', required: false })
+  @IsBoolean()
+  @IsOptional()
+  isMainStorage?: boolean;
 
   @ApiProperty({ example: true, description: 'Is location active', required: false })
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
 }
+

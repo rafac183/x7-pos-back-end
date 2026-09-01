@@ -12,6 +12,9 @@ import { Location } from '../stocks/locations/entities/location.entity';
 import { Item } from '../stocks/items/entities/item.entity';
 import { MovementsModule } from '../stocks/movements/movements.module';
 import { MovementsService } from '../stocks/movements/movements.service';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+import { Movement } from '../stocks/movements/entities/movement.entity';
+import { StockAlertsModule } from '../../stock-alerts/stock-alerts.module';
 
 @Module({
   imports: [
@@ -23,8 +26,11 @@ import { MovementsService } from '../stocks/movements/movements.service';
       Supplier,
       Location,
       Item,
+      Supply,
+      Movement,
     ]),
     MovementsModule,
+    StockAlertsModule,
   ],
   controllers: [PurchaseOrderController],
   providers: [PurchaseOrderService],

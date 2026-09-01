@@ -60,11 +60,14 @@ export class StockLevelMonitorService {
 
     const items = await this.itemRepo.find({
       where: { id: In(uniqueIds), isActive: true },
-      relations: ['product', 'variant', 'location'],
+      relations: ['product', 'variant', 'location', 'supply'],
     });
 
     for (const item of items) {
-      if (item.product?.merchantId !== merchantId) {
+      if (item.product && item.product.merchantId !== merchantId) {
+        continue;
+      }
+      if (item.supply && item.supply.company_id !== merchant.companyId) {
         continue;
       }
       try {
@@ -111,10 +114,11 @@ export class StockLevelMonitorService {
       this.alertRepo.create({
         merchantId,
         stockItemId: item.id,
-        productId: item.productId,
-        variantId: item.variantId,
+        productId: item.productId ?? null,
+        variantId: item.variantId ?? null,
+        supplyId: item.supplyId ?? null,
         locationId: item.locationId,
-        categoryId: item.product?.categoryId ?? null,
+        categoryId: item.product?.categoryId ?? item.supply?.category_id ?? null,
         alertType: newState,
         currentQty,
         minimumQty,
@@ -122,7 +126,7 @@ export class StockLevelMonitorService {
         triggeredAt: now,
         resolvedAt: null,
         emailSentAt: null,
-      }),
+      } as Partial<InventoryStockAlert>),
     );
 
     const payload: InventoryStockAlertPayload = {
@@ -130,14 +134,15 @@ export class StockLevelMonitorService {
       companyId,
       merchantId,
       stockItemId: item.id,
-      productId: item.productId,
-      variantId: item.variantId,
+      productId: item.productId ?? null,
+      variantId: item.variantId ?? null,
+      supplyId: item.supplyId ?? null,
       locationId: item.locationId,
-      categoryId: item.product?.categoryId ?? null,
+      categoryId: item.product?.categoryId ?? item.supply?.category_id ?? null,
       alertType: newState,
       currentQty,
       minimumQty,
-      productName: item.product?.name ?? '',
+      productName: item.product?.name ?? item.supply?.name ?? '',
       variantName: item.variant?.name ?? '',
       locationName: item.location?.name ?? '',
     };

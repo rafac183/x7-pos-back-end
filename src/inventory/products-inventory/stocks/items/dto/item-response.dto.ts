@@ -1,8 +1,22 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SuccessResponse } from 'src/common/dtos/success-response.dto';
 import { ProductLittleResponseDto } from '../../../products/dto/product-response.dto';
 import { VariantLittleResponseDto } from '../../../variants/dto/variant-response.dto';
 import { LocationLittleResponseDto } from '../../locations/dto/location-response.dto';
+
+export class SupplyLittleResponseDto {
+  @ApiProperty({ example: 1, description: 'Supply ID' })
+  id: number;
+
+  @ApiProperty({ example: 'Tomato paste', description: 'Supply name' })
+  name: string;
+
+  @ApiProperty({ example: 'TOMATO_PASTE', description: 'Supply code' })
+  code: string;
+
+  @ApiPropertyOptional({ example: 'SKU-12345', description: 'Supply SKU' })
+  sku?: string | null;
+}
 
 export class ItemResponseDto {
   @ApiProperty({ example: 1, description: 'Item ID' })
@@ -38,6 +52,13 @@ export class ItemResponseDto {
     description: 'Associated variant details',
   })
   variant: VariantLittleResponseDto | null;
+
+  @ApiProperty({
+    type: () => SupplyLittleResponseDto,
+    nullable: true,
+    description: 'Associated supply (raw material) details',
+  })
+  supply: SupplyLittleResponseDto | null;
 
   @ApiProperty({
     type: () => LocationLittleResponseDto,

@@ -136,6 +136,8 @@ export class TablesService {
       location: dto.location,
       rotation: dto.rotation,
       shape: dto.shape,
+      width: dto.width ?? null,
+      height: dto.height ?? null,
       pos_x: dto.pos_x,
       pos_y: dto.pos_y,
       floorZone: { id: dto.floorZone } as FloorZone,
@@ -158,6 +160,8 @@ export class TablesService {
         location: savedTable.location,
         rotation: savedTable.rotation,
         shape: savedTable.shape,
+        width: savedTable.width ?? null,
+        height: savedTable.height ?? null,
         pos_x: savedTable.pos_x,
         pos_y: savedTable.pos_y,
         merchant: {
@@ -270,6 +274,8 @@ export class TablesService {
       location: table.location,
       rotation: table.rotation,
       shape: table.shape,
+      width: table.width ?? null,
+      height: table.height ?? null,
       pos_x: table.pos_x,
       pos_y: table.pos_y,
       merchant: {
@@ -358,6 +364,8 @@ export class TablesService {
         location: table.location,
         rotation: table.rotation,
         shape: table.shape,
+      width: table.width ?? null,
+      height: table.height ?? null,
         pos_x: table.pos_x,
         pos_y: table.pos_y,
         merchant: {
@@ -394,6 +402,8 @@ export class TablesService {
       'location',
       'rotation',
       'shape',
+      'width',
+      'height',
       'pos_x',
       'pos_y',
       'floorZone',
@@ -546,6 +556,8 @@ export class TablesService {
     if (dto.location !== undefined) table.location = dto.location.trim();
     if (dto.rotation !== undefined) table.rotation = dto.rotation;
     if (dto.shape !== undefined) table.shape = dto.shape;
+    if (dto.width !== undefined) table.width = dto.width ?? null;
+    if (dto.height !== undefined) table.height = dto.height ?? null;
     if (dto.pos_x !== undefined) table.pos_x = dto.pos_x;
     if (dto.pos_y !== undefined) table.pos_y = dto.pos_y;
 
@@ -575,6 +587,8 @@ export class TablesService {
         location: updated.location,
         rotation: updated.rotation,
         shape: updated.shape,
+        width: updated.width ?? null,
+        height: updated.height ?? null,
         pos_x: updated.pos_x,
         pos_y: updated.pos_y,
         merchant: {
@@ -677,6 +691,8 @@ export class TablesService {
         location: updated.location,
         rotation: updated.rotation,
         shape: updated.shape,
+        width: updated.width ?? null,
+        height: updated.height ?? null,
         pos_x: updated.pos_x,
         pos_y: updated.pos_y,
         merchant: {

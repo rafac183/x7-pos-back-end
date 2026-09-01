@@ -2,10 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsOptional, Min } from 'class-validator';
 
 export class CreateItemDto {
-  @ApiProperty({ example: 1, description: 'Associated product ID' })
-  @IsNotEmpty()
+  @ApiPropertyOptional({ example: 1, description: 'Associated product ID' })
+  @IsOptional()
   @IsInt()
-  productId: number;
+  productId?: number;
 
   @ApiProperty({
     example: 1,
@@ -15,13 +15,21 @@ export class CreateItemDto {
   @IsInt()
   locationId: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 1,
-    description: 'Associated variant ID (required)',
+    description: 'Associated variant ID',
   })
-  @IsNotEmpty()
+  @IsOptional()
   @IsInt()
-  variantId: number;
+  variantId?: number;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'Associated supply (raw material) ID',
+  })
+  @IsOptional()
+  @IsInt()
+  supplyId?: number;
 
   @ApiProperty({ example: 10, description: 'Current item quantity' })
   @IsNotEmpty()

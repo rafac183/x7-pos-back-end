@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SuccessResponse } from 'src/common/dtos/success-response.dto';
 import { ItemLittleResponseDto } from '../../items/dto/item-response.dto';
 import { MerchantResponseDto } from 'src/platform-saas/merchants/dtos/merchant-response.dto';
@@ -36,6 +36,18 @@ export class MovementResponseDto {
     nullable: true,
   })
   reason: string | null;
+
+  @ApiPropertyOptional({ example: 1, description: 'Source location ID' })
+  sourceLocationId: number | null;
+
+  @ApiPropertyOptional({ example: 2, description: 'Destination location ID' })
+  destinationLocationId: number | null;
+
+  @ApiPropertyOptional({ example: 'Admin', description: 'User who created the movement' })
+  createdBy: string | null;
+
+  @ApiPropertyOptional({ example: 'TRANSFER', description: 'Movement type description' })
+  movementType: string | null;
 
   @ApiProperty({
     type: () => MerchantResponseDto,

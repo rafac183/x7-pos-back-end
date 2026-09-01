@@ -18,8 +18,13 @@ import { PurchaseOrderItem } from '../purchase-order-item/entities/purchase-orde
 import { Location } from '../stocks/locations/entities/location.entity';
 import { Item } from '../stocks/items/entities/item.entity';
 import { PurchaseOrderStatus } from './constants/purchase-order-status.enum';
-import { MovementsStatus } from '../stocks/movements/constants/movements-status';
 import { MovementsService } from '../stocks/movements/movements.service';
+import { MovementsStatus } from '../stocks/movements/constants/movements-status';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
+import { Movement } from '../stocks/movements/entities/movement.entity';
+import { StockLevelMonitorService } from '../../stock-alerts/stock-level-monitor.service';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { ReceiveItemsDto } from './dto/receive-items.dto';
 
 @Injectable()
 export class PurchaseOrderService {
@@ -36,7 +41,12 @@ export class PurchaseOrderService {
     private readonly locationRepository: Repository<Location>,
     @InjectRepository(Item)
     private readonly itemRepository: Repository<Item>,
+    @InjectRepository(Supply)
+    private readonly supplyRepository: Repository<Supply>,
+    @InjectRepository(Movement)
+    private readonly movementRepository: Repository<Movement>,
     private readonly movementsService: MovementsService,
+    private readonly stockLevelMonitor: StockLevelMonitorService,
   ) {}
 
   async create(
@@ -64,8 +74,13 @@ export class PurchaseOrderService {
     try {
       let calculatedTotal = 0;
       const itemsToSave: {
-        productId: number;
-        variantId: number | null;
+        productId?: number | null;
+        variantId?: number | null;
+        rawMaterialId?: number | null;
+        purchaseUnit?: string | null;
+        quantityOrdered?: number | null;
+        unitCost?: number | null;
+        taxAmount?: number | null;
         locationId: number;
         quantity: number;
         unitPrice: number;
@@ -74,25 +89,55 @@ export class PurchaseOrderService {
 
       if (items && Array.isArray(items)) {
         for (const item of items) {
-          if (!item.variantId) {
-            throw new Error('Cada ítem de la orden de compra debe tener una variante asociada.');
-          }
           if (!item.locationId) {
-            throw new Error('Cada ítem de la orden de compra debe tener una localización de destino asignada.');
+            throw new BadRequestException('Cada ítem de la orden de compra debe tener una localización de destino asignada.');
           }
-          const qty = Number(item.quantity) || 0;
-          const price = Number(item.unitPrice) || 0;
-          const totalPrice = qty * price;
-          calculatedTotal += totalPrice;
 
-          itemsToSave.push({
-            productId: Number(item.productId),
-            variantId: Number(item.variantId),
-            locationId: Number(item.locationId),
-            quantity: qty,
-            unitPrice: price,
-            totalPrice: totalPrice,
-          });
+          if (item.rawMaterialId) {
+            const rawMaterial = await this.supplyRepository.findOneBy({
+              id: item.rawMaterialId,
+              company_id: supplier.company_id,
+            });
+            if (!rawMaterial) {
+              throw new NotFoundException(`Raw material with ID ${item.rawMaterialId} not found under company`);
+            }
+
+            const qtyOrdered = Number(item.quantityOrdered) || 0;
+            const cost = Number(item.unitCost) || 0;
+            const tax = Number(item.taxAmount) || 0;
+            const totalPrice = (qtyOrdered * cost) + tax;
+            calculatedTotal += totalPrice;
+
+            itemsToSave.push({
+              rawMaterialId: rawMaterial.id,
+              purchaseUnit: item.purchaseUnit || 'unit',
+              quantityOrdered: qtyOrdered,
+              unitCost: cost,
+              taxAmount: tax,
+              locationId: Number(item.locationId),
+              quantity: Math.ceil(qtyOrdered), // Mapeo a cantidad entera para compatibilidad
+              unitPrice: cost,
+              totalPrice: totalPrice,
+            });
+          } else {
+            // Mantenemos compatibilidad con productos terminados
+            if (!item.variantId) {
+              throw new BadRequestException('Cada ítem de producto terminado de la orden de compra debe tener una variante asociada.');
+            }
+            const qty = Number(item.quantity) || 0;
+            const price = Number(item.unitPrice) || 0;
+            const totalPrice = qty * price;
+            calculatedTotal += totalPrice;
+
+            itemsToSave.push({
+              productId: Number(item.productId),
+              variantId: Number(item.variantId),
+              locationId: Number(item.locationId),
+              quantity: qty,
+              unitPrice: price,
+              totalPrice: totalPrice,
+            });
+          }
         }
       }
 
@@ -101,7 +146,7 @@ export class PurchaseOrderService {
         : calculatedTotal;
 
       const newPurchaseOrder = this.purchaseOrderRepository.create({
-        status: purchaseOrderData.status,
+        status: purchaseOrderData.status || PurchaseOrderStatus.DRAFT,
         totalAmount: finalTotal,
         merchantId: merchant_id,
         supplierId,
@@ -113,27 +158,34 @@ export class PurchaseOrderService {
       if (itemsToSave.length > 0) {
         const itemsWithOrder = itemsToSave.map(item => {
           const poItem = new PurchaseOrderItem();
-          poItem.productId = item.productId;
-          poItem.variantId = item.variantId as any;
+          poItem.productId = item.productId || null;
+          poItem.variantId = item.variantId || null;
+          poItem.rawMaterialId = item.rawMaterialId || null;
+          poItem.purchaseUnit = item.purchaseUnit || null;
+          poItem.quantityOrdered = item.quantityOrdered || null;
+          poItem.unitCost = item.unitCost || null;
+          poItem.taxAmount = item.taxAmount || 0;
           poItem.locationId = item.locationId;
           poItem.quantity = item.quantity;
           poItem.unitPrice = item.unitPrice;
           poItem.totalPrice = item.totalPrice;
           poItem.purchaseOrderId = savedPurchaseOrder.id;
-          poItem.receivedQuantity = 0; // Siempre inicializar en 0 para que increaseStockForOrder calcule diff correcto
+          poItem.receivedQuantity = 0;
           return poItem;
         });
         await this.purchaseOrderItemRepository.save(itemsWithOrder);
 
-        // Si la orden se crea directamente en estado COMPLETED o PARTIALLY_RECEIVED, incrementamos el stock
-        const targetReceivedStatuses = [PurchaseOrderStatus.COMPLETED, PurchaseOrderStatus.PARTIALLY_RECEIVED];
+        const targetReceivedStatuses = [PurchaseOrderStatus.RECEIVED, PurchaseOrderStatus.COMPLETED, PurchaseOrderStatus.PARTIALLY_RECEIVED];
         if (targetReceivedStatuses.includes(savedPurchaseOrder.status)) {
           await this.increaseStockForOrder(savedPurchaseOrder.id, merchant_id, savedPurchaseOrder.status);
         }
       }
 
       return this.findOne(savedPurchaseOrder.id, merchant_id, 'Created');
-    } catch (error) {
+    } catch (error: any) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       ErrorHandler.handleDatabaseError(error);
     }
   }
@@ -208,6 +260,11 @@ export class PurchaseOrderService {
             totalPrice: item.totalPrice,
             productId: item.productId,
             variantId: item.variantId,
+            rawMaterialId: item.rawMaterialId,
+            purchaseUnit: item.purchaseUnit,
+            quantityOrdered: item.quantityOrdered,
+            unitCost: item.unitCost,
+            taxAmount: item.taxAmount,
           })),
         };
         return result;
@@ -254,7 +311,9 @@ export class PurchaseOrderService {
         'supplier',
         'purchaseOrderItems',
         'purchaseOrderItems.product',
-        'purchaseOrderItems.variant'
+        'purchaseOrderItems.variant',
+        'purchaseOrderItems.rawMaterial',
+        'purchaseOrderItems.location'
       ],
     });
 
@@ -289,6 +348,16 @@ export class PurchaseOrderService {
         totalPrice: item.totalPrice,
         productId: item.productId,
         variantId: item.variantId,
+        rawMaterialId: item.rawMaterialId,
+        purchaseUnit: item.purchaseUnit,
+        quantityOrdered: item.quantityOrdered,
+        unitCost: item.unitCost,
+        taxAmount: item.taxAmount,
+        locationId: item.locationId,
+        location: item.location ? {
+          id: item.location.id,
+          name: item.location.name
+        } : null,
         product: item.product ? {
           id: item.product.id,
           name: item.product.name,
@@ -298,9 +367,15 @@ export class PurchaseOrderService {
           id: item.variant.id,
           name: item.variant.name,
           sku: item.variant.sku
+        } : null,
+        rawMaterial: item.rawMaterial ? {
+          id: item.rawMaterial.id,
+          name: item.rawMaterial.name,
+          sku: item.rawMaterial.sku
         } : null
       }))
     };
+
 
     let response: OnePurchaseOrderResponse;
 
@@ -377,9 +452,32 @@ export class PurchaseOrderService {
 
     const oldStatus = purchaseOrder.status;
 
-    if (updateData.status && updateData.status !== purchaseOrder.status) {
+    // Validar transiciones de estado no permitidas (regresiones desde estados recibidos o cancelados)
+    if (updateData.status && updateData.status !== oldStatus) {
+      if (oldStatus === PurchaseOrderStatus.RECEIVED || oldStatus === PurchaseOrderStatus.CANCELLED) {
+        throw new BadRequestException(`Cannot change status of a purchase order that is already ${oldStatus}.`);
+      }
+      if (oldStatus === PurchaseOrderStatus.PARTIALLY_RECEIVED && (updateData.status === PurchaseOrderStatus.DRAFT || updateData.status === PurchaseOrderStatus.SENT)) {
+        throw new BadRequestException('Cannot regress a PARTIALLY_RECEIVED purchase order back to DRAFT or SENT.');
+      }
       purchaseOrder.orderDate = new Date();
     }
+
+    // Bloquear actualizaciones de detalles e ítems si no está en DRAFT o SENT
+    const hasDetailItemChanges = Array.isArray(updateProductDto.items) && updateProductDto.items.some(it =>
+      it.rawMaterialId !== undefined ||
+      it.quantityOrdered !== undefined ||
+      it.quantity !== undefined ||
+      it.unitCost !== undefined ||
+      it.unitPrice !== undefined
+    );
+    const isChangingDetails = hasDetailItemChanges || supplierId !== undefined || updateProductDto.totalAmount !== undefined;
+
+    if (isChangingDetails && oldStatus !== PurchaseOrderStatus.DRAFT && oldStatus !== PurchaseOrderStatus.SENT) {
+      throw new BadRequestException('Updates to purchase order details or items are allowed only in DRAFT or SENT states.');
+    }
+
+
 
     try {
       // Solo actualizar los campos simples — excluir 'items' del DTO para no contaminar la entidad
@@ -391,10 +489,10 @@ export class PurchaseOrderService {
       });
       await this.purchaseOrderRepository.save(purchaseOrder);
 
-      const targetReceivedStatuses = [PurchaseOrderStatus.COMPLETED, PurchaseOrderStatus.PARTIALLY_RECEIVED];
+      const targetReceivedStatuses = [PurchaseOrderStatus.RECEIVED, PurchaseOrderStatus.COMPLETED, PurchaseOrderStatus.PARTIALLY_RECEIVED];
       const isNowReceived = targetReceivedStatuses.includes(purchaseOrder.status);
 
-      // 1. Si vienen items con receivedQuantity, los actualizamos e incrementamos el stock por la diferencia
+      // 1. Si vienen items y el estado es DRAFT o SENT, sincronizamos las líneas de la orden (modificar/agregar/eliminar)
       if (updateProductDto.items && Array.isArray(updateProductDto.items)) {
         let location = await this.locationRepository.findOne({
           where: { merchantId: merchant_id, isActive: true }
@@ -410,82 +508,120 @@ export class PurchaseOrderService {
           location = await this.locationRepository.save(location);
         }
 
-        for (const itemDto of updateProductDto.items) {
-          const dbItem = await this.purchaseOrderItemRepository.findOneBy({
-            id: Number(itemDto.id),
-            purchaseOrderId: id,
-            isActive: true
+        const isDraftOrSent = oldStatus === PurchaseOrderStatus.DRAFT || oldStatus === PurchaseOrderStatus.SENT;
+        const isFullGridUpdate = updateProductDto.items.some(it =>
+          it.rawMaterialId !== undefined ||
+          it.quantityOrdered !== undefined ||
+          it.quantity !== undefined ||
+          it.unitCost !== undefined ||
+          it.unitPrice !== undefined
+        );
+
+        if (isDraftOrSent && isFullGridUpdate) {
+          const existingItems = await this.purchaseOrderItemRepository.find({
+            where: { purchaseOrderId: id, isActive: true }
           });
+          const processedItemIds = new Set<number>();
+          let recalculatedTotal = 0;
 
-          if (dbItem) {
-            const oldReceived = Number(dbItem.receivedQuantity) || 0;
-            // Si el estado de la orden es COMPLETED, asumimos que se recibió todo el ítem
-            const newReceived = purchaseOrder.status === PurchaseOrderStatus.COMPLETED
-              ? Number(dbItem.quantity)
-              : (itemDto.receivedQuantity !== undefined && itemDto.receivedQuantity !== null
-                  ? Number(itemDto.receivedQuantity)
-                  : oldReceived);
-            const diff = newReceived - oldReceived;
+          for (const itemDto of updateProductDto.items) {
+            const rawItemId = itemDto.id ? Number(itemDto.id) : null;
+            let dbItem = (rawItemId !== null && !isNaN(rawItemId) && rawItemId > 0)
+              ? existingItems.find(i => i.id === rawItemId)
+              : null;
 
-            dbItem.receivedQuantity = newReceived;
-            await this.purchaseOrderItemRepository.save(dbItem);
-
-            if (isNowReceived && diff !== 0) {
-              const targetLocationId = dbItem.locationId || location.id;
-              const whereClause: any = {
-                productId: dbItem.productId,
-                locationId: targetLocationId
-              };
-              if (dbItem.variantId) {
-                whereClause.variantId = dbItem.variantId;
-              } else {
-                whereClause.variantId = IsNull();
+            if (dbItem) {
+              if (itemDto.rawMaterialId) dbItem.rawMaterialId = Number(itemDto.rawMaterialId);
+              if (itemDto.purchaseUnit) dbItem.purchaseUnit = itemDto.purchaseUnit;
+              if (itemDto.quantityOrdered !== undefined || itemDto.quantity !== undefined) {
+                const q = Number(itemDto.quantityOrdered ?? itemDto.quantity);
+                dbItem.quantityOrdered = q;
+                dbItem.quantity = Math.ceil(q);
+              }
+              if (itemDto.unitCost !== undefined || itemDto.unitPrice !== undefined) {
+                const c = Number(itemDto.unitCost ?? itemDto.unitPrice);
+                dbItem.unitCost = c;
+                dbItem.unitPrice = c;
+              }
+              if (itemDto.taxAmount !== undefined) {
+                dbItem.taxAmount = Number(itemDto.taxAmount);
+              }
+              if (itemDto.locationId) {
+                dbItem.locationId = Number(itemDto.locationId);
               }
 
-              let stockItem = await this.itemRepository.findOne({
-                where: whereClause
-              });
+              const itemQty = Number(dbItem.quantityOrdered ?? dbItem.quantity) || 0;
+              const itemCost = Number(dbItem.unitCost ?? dbItem.unitPrice) || 0;
+              const itemTax = Number(dbItem.taxAmount) || 0;
+              dbItem.totalPrice = (itemQty * itemCost) + itemTax;
+              recalculatedTotal += dbItem.totalPrice;
 
-              if (stockItem) {
-                const oldQty = Number(stockItem.currentQty) || 0;
-                stockItem.currentQty = oldQty + diff;
-                stockItem.isActive = true; // Reactivar si estaba inactivo
-                stockItem = await this.itemRepository.save(stockItem);
-              } else {
-                const createData: DeepPartial<Item> = {
-                  productId: dbItem.productId,
-                  locationId: targetLocationId,
-                  currentQty: diff,
-                  isActive: true
-                };
-                if (dbItem.variantId) {
-                  createData.variantId = dbItem.variantId;
-                }
-                const newStockItem = this.itemRepository.create(createData);
-                stockItem = await this.itemRepository.save(newStockItem);
-              }
+              dbItem = await this.purchaseOrderItemRepository.save(dbItem);
+              processedItemIds.add(dbItem.id);
+            } else {
+              const qtyOrdered = Number(itemDto.quantityOrdered ?? itemDto.quantity) || 0;
+              const cost = Number(itemDto.unitCost ?? itemDto.unitPrice) || 0;
+              const tax = Number(itemDto.taxAmount) || 0;
+              const totalPrice = (qtyOrdered * cost) + tax;
+              recalculatedTotal += totalPrice;
 
-              // Registrar el movimiento de auditoría
-              await this.movementsService.create(merchant_id, {
-                stockItemId: stockItem.id,
-                quantity: Math.abs(diff),
-                type: diff > 0 ? MovementsStatus.PURCHASE_ENTRY : MovementsStatus.OUT,
-                reference: `PO-${id}`,
-                reason: `Fulfillment of Purchase Order #${id} (Partial / Update)`,
+              const newItem = this.purchaseOrderItemRepository.create({
+                purchaseOrderId: id,
+                rawMaterialId: itemDto.rawMaterialId ? Number(itemDto.rawMaterialId) : null,
+                productId: itemDto.productId ? Number(itemDto.productId) : null,
+                variantId: itemDto.variantId ? Number(itemDto.variantId) : null,
+                purchaseUnit: itemDto.purchaseUnit || 'unit',
+                quantityOrdered: qtyOrdered,
+                quantity: Math.ceil(qtyOrdered),
+                unitCost: cost,
+                unitPrice: cost,
+                taxAmount: tax,
+                totalPrice: totalPrice,
+                locationId: itemDto.locationId ? Number(itemDto.locationId) : location.id,
+                receivedQuantity: 0,
+                isActive: true
               });
+              const savedItem = await this.purchaseOrderItemRepository.save(newItem);
+              processedItemIds.add(savedItem.id);
             }
           }
+
+          // Eliminar los ítems removidos en la edición
+          for (const oldItem of existingItems) {
+            if (!processedItemIds.has(oldItem.id)) {
+              await this.purchaseOrderItemRepository.remove(oldItem);
+            }
+          }
+
+          // Actualizar el totalAmount de la orden
+          purchaseOrder.totalAmount = updateProductDto.totalAmount !== undefined 
+            ? updateProductDto.totalAmount 
+            : recalculatedTotal;
+          await this.purchaseOrderRepository.save(purchaseOrder);
         }
-      } else {
-        // 2. Si no vienen items específicos pero cambia el estatus a COMPLETED/PARTIALLY_RECEIVED, procesamos todo el pedido
-        const wasAlreadyReceived = targetReceivedStatuses.includes(oldStatus);
-        if (isNowReceived && !wasAlreadyReceived) {
-          await this.increaseStockForOrder(id, merchant_id, purchaseOrder.status);
+
+
+        // 2. Si updateProductDto contiene ítems con receivedQuantity, procesar mediante receiveOrderItems para evitar duplicación
+        if (Array.isArray(updateProductDto.items) && updateProductDto.items.some(i => i.receivedQuantity !== undefined)) {
+          const receiveDto = {
+            items: updateProductDto.items.map(i => ({
+              id: Number(i.id),
+              receivedQuantity: Number(i.receivedQuantity) || 0
+            }))
+          };
+          return await this.receiveOrderItems(id, merchant_id, receiveDto);
         }
       }
 
       return this.findOne(id, merchant_id, 'Updated');
+
+
+
+      return this.findOne(id, merchant_id, 'Updated');
     } catch (error: any) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
       ErrorHandler.handleDatabaseError(error);
     }
   }
@@ -512,24 +648,33 @@ export class PurchaseOrderService {
 
       for (const item of orderItems) {
         const oldReceived = Number(item.receivedQuantity) || 0;
-        // Para COMPLETED: el total a recibir es item.quantity; diff es lo pendiente de recibir
-        const newReceived = status === PurchaseOrderStatus.COMPLETED ? Number(item.quantity) : oldReceived;
-        const diff = newReceived - oldReceived;
+        const ordered = Number(item.quantityOrdered || item.quantity) || 0;
+        const maxCanReceive = Math.max(0, ordered - oldReceived);
+
+        // Para COMPLETED / RECEIVED: el total a recibir es el quantityOrdered/quantity; diff es lo pendiente de recibir
+        const targetCompleted = status === PurchaseOrderStatus.COMPLETED || status === PurchaseOrderStatus.RECEIVED;
+        const newReceived = targetCompleted ? ordered : oldReceived;
+        const diff = Math.min(newReceived - oldReceived, maxCanReceive);
 
         if (diff > 0) {
-          item.receivedQuantity = newReceived;
+          item.receivedQuantity = oldReceived + diff;
           await this.purchaseOrderItemRepository.save(item);
+
 
           const targetLocationId = item.locationId || defaultLocation.id;
 
           const whereClause: any = {
-            productId: item.productId,
             locationId: targetLocationId
           };
-          if (item.variantId) {
-            whereClause.variantId = item.variantId;
+          if (item.rawMaterialId) {
+            whereClause.supplyId = item.rawMaterialId;
           } else {
-            whereClause.variantId = IsNull();
+            whereClause.productId = item.productId;
+            if (item.variantId) {
+              whereClause.variantId = item.variantId;
+            } else {
+              whereClause.variantId = IsNull();
+            }
           }
 
           const stockItem = await this.itemRepository.findOne({
@@ -544,19 +689,24 @@ export class PurchaseOrderService {
             await this.movementsService.create(merchantId, {
               stockItemId: stockItem.id,
               quantity: diff,
-              type: MovementsStatus.PURCHASE_ENTRY,
+              type: MovementsStatus.IN,
               reference: `PO-${purchaseOrderId}`,
               reason: `Fulfillment of Purchase Order #${purchaseOrderId}`,
+              movementType: 'PURCHASE_RECEIPT',
             });
           } else {
             const createData: DeepPartial<Item> = {
-              productId: item.productId,
               locationId: targetLocationId,
               currentQty: diff,
               isActive: true
             };
-            if (item.variantId) {
-              createData.variantId = item.variantId;
+            if (item.rawMaterialId) {
+              createData.supplyId = item.rawMaterialId;
+            } else {
+              createData.productId = item.productId;
+              if (item.variantId) {
+                createData.variantId = item.variantId;
+              }
             }
             const newStockItem = this.itemRepository.create(createData);
             const savedStockItem = await this.itemRepository.save(newStockItem);
@@ -564,9 +714,10 @@ export class PurchaseOrderService {
             await this.movementsService.create(merchantId, {
               stockItemId: savedStockItem.id,
               quantity: diff,
-              type: MovementsStatus.PURCHASE_ENTRY,
+              type: MovementsStatus.IN,
               reference: `PO-${purchaseOrderId}`,
               reason: `Fulfillment of Purchase Order #${purchaseOrderId}`,
+              movementType: 'PURCHASE_RECEIPT',
             });
           }
         }
@@ -607,5 +758,184 @@ export class PurchaseOrderService {
     } catch (error) {
       ErrorHandler.handleDatabaseError(error);
     }
+  }
+
+  async receiveOrderItems(
+    id: number,
+    merchantId: number,
+    dto: ReceiveItemsDto,
+    creatorEmail?: string,
+  ): Promise<OnePurchaseOrderResponse> {
+    const purchaseOrder = await this.purchaseOrderRepository.findOne({
+      where: { id, merchantId, isActive: true },
+      relations: ['purchaseOrderItems'],
+    });
+
+    if (!purchaseOrder) {
+      throw new NotFoundException(`Purchase Order with ID ${id} not found`);
+    }
+
+    const validStatuses = [PurchaseOrderStatus.SENT, PurchaseOrderStatus.PARTIALLY_RECEIVED];
+    if (!validStatuses.includes(purchaseOrder.status)) {
+      throw new BadRequestException(`Cannot receive items for purchase order in status ${purchaseOrder.status}`);
+    }
+
+    let defaultLocation = await this.locationRepository.findOne({
+      where: { merchantId, isActive: true },
+    });
+
+    if (!defaultLocation) {
+      defaultLocation = this.locationRepository.create({
+        name: 'Main Warehouse',
+        address: 'Default address location',
+        merchantId,
+        isActive: true,
+      });
+      defaultLocation = await this.locationRepository.save(defaultLocation);
+    }
+
+    const evaluatedStockIds = new Set<number>();
+
+    for (const receiveLine of dto.items) {
+      const itemLine = purchaseOrder.purchaseOrderItems.find(
+        (poi) => poi.id === receiveLine.id && poi.isActive,
+      );
+
+      if (!itemLine) {
+        throw new NotFoundException(`Purchase order item with ID ${receiveLine.id} not found on this order`);
+      }
+
+      const oldReceived = Number(itemLine.receivedQuantity) || 0;
+      const ordered = Number(itemLine.quantityOrdered || itemLine.quantity) || 0;
+      const maxCanReceive = Math.max(0, ordered - oldReceived);
+
+      let additionalReceived = Number(receiveLine.receivedQuantity) || 0;
+      if (additionalReceived > maxCanReceive) {
+        additionalReceived = maxCanReceive;
+      }
+
+      if (additionalReceived <= 0) {
+        continue;
+      }
+
+      const targetReceived = oldReceived + additionalReceived;
+
+      // Guardar el nuevo acumulado recibido en el ítem de la orden de compra
+      itemLine.receivedQuantity = targetReceived;
+      await this.purchaseOrderItemRepository.save(itemLine);
+
+
+      const targetLocationId = itemLine.locationId || defaultLocation.id;
+
+      // Buscar o crear el stock_item para el ingrediente/producto
+      const whereClause: any = { locationId: targetLocationId };
+      if (itemLine.rawMaterialId) {
+        whereClause.supplyId = itemLine.rawMaterialId;
+      } else {
+        whereClause.productId = itemLine.productId;
+        if (itemLine.variantId) {
+          whereClause.variantId = itemLine.variantId;
+        } else {
+          whereClause.variantId = IsNull();
+        }
+      }
+
+      let stockItem = await this.itemRepository.findOne({
+        where: whereClause,
+      });
+
+      if (!stockItem) {
+        const createData: DeepPartial<Item> = {
+          locationId: targetLocationId,
+          currentQty: 0,
+          isActive: true,
+          weightedAverageUnitCost: '0.0000',
+        };
+        if (itemLine.rawMaterialId) {
+          createData.supplyId = itemLine.rawMaterialId;
+        } else {
+          createData.productId = itemLine.productId;
+          if (itemLine.variantId) {
+            createData.variantId = itemLine.variantId;
+          }
+        }
+        stockItem = this.itemRepository.create(createData);
+        stockItem = await this.itemRepository.save(stockItem);
+      }
+
+      const oldQty = Number(stockItem.currentQty) || 0;
+      const oldWacc = Number(stockItem.weightedAverageUnitCost) || 0;
+      const purchaseCost = Number(itemLine.unitCost || itemLine.unitPrice) || 0;
+
+      // Calcular nuevo WACC
+      let newWacc = oldWacc;
+      const newTotalQty = oldQty + additionalReceived;
+      if (newTotalQty > 0) {
+        newWacc = ((oldQty * oldWacc) + (additionalReceived * purchaseCost)) / newTotalQty;
+      }
+
+      // Actualizar el stock físico
+      stockItem.currentQty = newTotalQty;
+      stockItem.weightedAverageUnitCost = newWacc.toFixed(4);
+      await this.itemRepository.save(stockItem);
+      evaluatedStockIds.add(stockItem.id);
+
+      // Si es materia prima, actualizar el cost_per_unit en Supplies
+      if (itemLine.rawMaterialId) {
+        const supply = await this.supplyRepository.findOneBy({ id: itemLine.rawMaterialId });
+        if (supply) {
+          supply.cost_per_unit = purchaseCost;
+          await this.supplyRepository.save(supply);
+        }
+      }
+
+      // Crear el movimiento auditado
+      const movement = this.movementRepository.create({
+        stockItemId: stockItem.id,
+        quantity: additionalReceived,
+        type: MovementsStatus.IN,
+        reference: `PO-${id}`,
+        reason: `Receipt of items against PO #${id}`,
+        merchantId,
+        isActive: true,
+        sourceLocationId: null,
+        destinationLocationId: targetLocationId,
+        createdBy: creatorEmail || 'Receiving Clerk',
+        movementType: 'PURCHASE_RECEIPT',
+      });
+      await this.movementRepository.save(movement);
+    }
+
+    // Determinar nuevo estado de la orden
+    let allReceived = true;
+    let anyReceived = false;
+
+    for (const item of purchaseOrder.purchaseOrderItems) {
+      if (item.isActive) {
+        const ordered = Number(item.quantityOrdered || item.quantity) || 0;
+        const received = Number(item.receivedQuantity) || 0;
+
+        if (received < ordered) {
+          allReceived = false;
+        }
+        if (received > 0) {
+          anyReceived = true;
+        }
+      }
+    }
+
+    if (allReceived) {
+      purchaseOrder.status = PurchaseOrderStatus.RECEIVED;
+    } else if (anyReceived) {
+      purchaseOrder.status = PurchaseOrderStatus.PARTIALLY_RECEIVED;
+    }
+
+    await this.purchaseOrderRepository.save(purchaseOrder);
+
+    if (evaluatedStockIds.size > 0) {
+      await this.stockLevelMonitor.evaluateStockItems(merchantId, Array.from(evaluatedStockIds));
+    }
+
+    return this.findOne(id, merchantId, 'Updated');
   }
 }

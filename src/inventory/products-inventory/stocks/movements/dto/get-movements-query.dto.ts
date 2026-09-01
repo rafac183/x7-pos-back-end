@@ -43,4 +43,25 @@ export class GetMovementsQueryDto {
   @Type(() => Number)
   @IsNumber()
   itemId?: number;
+
+  @ApiPropertyOptional({ example: '2023-01-01', description: 'Filter movements starting from date' })
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @ApiPropertyOptional({ example: '2023-12-31', description: 'Filter movements up to date' })
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @ApiPropertyOptional({ example: 'TRANSFER', description: 'Filter by raw material stock movement type' })
+  @IsOptional()
+  @IsString()
+  movementType?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Filter by supply ID' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  supplyId?: number;
 }

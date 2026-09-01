@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { UpdateMovementDto } from './dto/update-movement.dto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
+
 import { Movement } from './entities/movement.entity';
 import {
   MovementResponseDto,
@@ -14,6 +15,13 @@ import { ItemLittleResponseDto } from '../items/dto/item-response.dto';
 import { ErrorHandler } from 'src/common/utils/error-handler.util';
 import { ErrorMessage } from 'src/common/constants/error-messages';
 import { Item } from '../items/entities/item.entity';
+import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
+import { ProductRecipe } from '../../recipes/entities/product-recipe.entity';
+import { Order } from 'src/restaurant-operations/pos/orders/entities/order.entity';
+import { StockLevelMonitorService } from '../../../stock-alerts/stock-level-monitor.service';
+import { MovementsStatus } from './constants/movements-status';
+import { Location } from '../locations/entities/location.entity';
+
 
 @Injectable()
 export class MovementsService {
@@ -22,13 +30,23 @@ export class MovementsService {
     private readonly movementRepository: Repository<Movement>,
     @InjectRepository(Item)
     private readonly itemRepository: Repository<Item>,
+    @InjectRepository(ProductRecipe)
+    private readonly recipeRepository: Repository<ProductRecipe>,
+    @InjectRepository(Order)
+    private readonly orderRepository: Repository<Order>,
+    private readonly stockLevelMonitor: StockLevelMonitorService,
   ) {}
 
   async create(
     merchant_id: number,
-    createMovementDto: CreateMovementDto,
+    createMovementDto: CreateMovementDto & {
+      sourceLocationId?: number | null;
+      destinationLocationId?: number | null;
+      createdBy?: string | null;
+      movementType?: string | null;
+    },
   ): Promise<OneMovementResponse> {
-    const { stockItemId, quantity, type, reference, reason } =
+    const { stockItemId, quantity, type, reference, reason, sourceLocationId, destinationLocationId, createdBy, movementType } =
       createMovementDto;
     const merchantId = merchant_id;
 
@@ -40,16 +58,69 @@ export class MovementsService {
       ErrorHandler.invalidId(ErrorMessage.MOVEMENT_QUANTITY_INVALID);
     }
 
+    const merchant = await this.itemRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+
     const item = await this.itemRepository
       .createQueryBuilder('item')
       .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.supply', 'supply')
       .where('item.id = :stockItemId', { stockItemId })
-      .andWhere('product.merchantId = :merchantId', { merchantId })
+      .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('item.isActive = :isActive', { isActive: true })
       .getOne();
 
     if (!item) {
       ErrorHandler.notFound(ErrorMessage.ITEM_NOT_FOUND);
+    }
+
+    // Actualizar las existencias en stock_item según la naturaleza del movimiento
+    const isEntry = type === MovementsStatus.IN || ['PURCHASE_RECEIPT', 'RETURN', 'IN'].includes(movementType || '');
+    const isTransfer = movementType === 'TRANSFER' && destinationLocationId && destinationLocationId !== item.locationId;
+
+    if (isTransfer) {
+      // 1. Restar stock del almacén de origen
+      item.currentQty = Math.max(0, Number(item.currentQty || 0) - Number(quantity));
+      await this.itemRepository.save(item);
+
+      // 2. Buscar o inicializar el stock_item en la ubicación de destino
+      let destItem = await this.itemRepository.findOne({
+        where: {
+          supplyId: item.supplyId || undefined,
+          productId: item.productId || undefined,
+          variantId: item.variantId || undefined,
+          locationId: destinationLocationId,
+          isActive: true,
+        },
+      });
+
+      if (!destItem) {
+        destItem = this.itemRepository.create({
+          supplyId: item.supplyId,
+          productId: item.productId,
+          variantId: item.variantId,
+          locationId: destinationLocationId,
+          currentQty: 0,
+          minimumQty: 5,
+          isActive: true,
+          weightedAverageUnitCost: item.weightedAverageUnitCost || '0.0000',
+        });
+      }
+
+      destItem.currentQty = Number(destItem.currentQty || 0) + Number(quantity);
+      await this.itemRepository.save(destItem);
+    } else if (isEntry) {
+      item.currentQty = Number(item.currentQty || 0) + Number(quantity);
+      await this.itemRepository.save(item);
+    } else {
+      // Salida, mermas (WASTE), consumo o ajuste negativo
+      item.currentQty = Math.max(0, Number(item.currentQty || 0) - Number(quantity));
+      await this.itemRepository.save(item);
     }
 
     const newMovement = this.movementRepository.create({
@@ -60,11 +131,23 @@ export class MovementsService {
       reason,
       merchantId: merchant_id,
       isActive: true,
+      sourceLocationId: sourceLocationId ?? item.locationId ?? null,
+      destinationLocationId: destinationLocationId ?? null,
+      createdBy: createdBy ?? null,
+      movementType: movementType ?? null,
     });
 
     const savedMovement = await this.movementRepository.save(newMovement);
 
+    // Monitorear y evaluar alertas de stock mínimo
+    try {
+      await this.stockLevelMonitor.evaluateStockItems(merchantId, [item.id]);
+    } catch (e) {
+      console.error('Error evaluating stock levels post movement:', e);
+    }
+
     return this.findOne(savedMovement.id, merchantId, 'Created');
+
   }
 
   async findAll(
@@ -77,24 +160,59 @@ export class MovementsService {
     const skip = (page - 1) * limit;
 
     // 2. Build query with filters
+    const merchant = await this.itemRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['companyId'],
+    });
+
     const queryBuilder = this.movementRepository
       .createQueryBuilder('movement')
       .leftJoinAndSelect('movement.item', 'item')
       .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.supply', 'supply')
       .leftJoinAndSelect('movement.merchant', 'merchant')
-      .where('product.merchantId = :merchantId', { merchantId })
+      .where('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+        merchantId,
+        companyId: merchant?.companyId,
+      })
       .andWhere('movement.isActive = :isActive', { isActive: true });
 
-    // 3. Apply optional filters
     if (query.itemName) {
-      queryBuilder.andWhere('LOWER(product.name) LIKE LOWER(:itemName)', {
-        itemName: `%${query.itemName}%`,
-      });
+      queryBuilder.andWhere(
+        '(LOWER(product.name) LIKE LOWER(:itemName) OR LOWER(supply.name) LIKE LOWER(:itemName))',
+        { itemName: `%${query.itemName}%` },
+      );
     }
 
     if (query.itemId) {
       queryBuilder.andWhere('item.id = :itemId', {
         itemId: query.itemId,
+      });
+    }
+
+    if (query.startDate) {
+      queryBuilder.andWhere('movement.createdAt >= :startDate', {
+        startDate: new Date(query.startDate),
+      });
+    }
+
+    if (query.endDate) {
+      const end = new Date(query.endDate);
+      end.setHours(23, 59, 59, 999);
+      queryBuilder.andWhere('movement.createdAt <= :endDate', {
+        endDate: end,
+      });
+    }
+
+    if (query.movementType) {
+      queryBuilder.andWhere('movement.movementType = :movementType', {
+        movementType: query.movementType,
+      });
+    }
+
+    if (query.supplyId) {
+      queryBuilder.andWhere('item.supplyId = :supplyId', {
+        supplyId: query.supplyId,
       });
     }
 
@@ -128,6 +246,10 @@ export class MovementsService {
           type: movement.type,
           reference: movement.reference,
           reason: movement.reason,
+          sourceLocationId: movement.sourceLocationId,
+          destinationLocationId: movement.destinationLocationId,
+          createdBy: movement.createdBy,
+          movementType: movement.movementType,
           merchant: movement.merchant
             ? {
                 id: movement.merchant.id,
@@ -175,10 +297,20 @@ export class MovementsService {
       whereCondition.merchantId = merchantId;
     }
 
+    let companyId: number | undefined;
+    if (merchantId !== undefined) {
+      const merchant = await this.itemRepository.manager.findOne(Merchant, {
+        where: { id: merchantId },
+        select: ['companyId'],
+      });
+      companyId = merchant?.companyId;
+    }
+
     const movementQueryBuilder = this.movementRepository
       .createQueryBuilder('movement')
       .leftJoinAndSelect('movement.item', 'item')
-      .leftJoinAndSelect('item.product', 'product') // Join product through item
+      .leftJoinAndSelect('item.product', 'product')
+      .leftJoinAndSelect('item.supply', 'supply')
       .leftJoinAndSelect('movement.merchant', 'merchant')
       .where('movement.id = :id', { id })
       .andWhere('movement.isActive = :isActive', {
@@ -186,9 +318,10 @@ export class MovementsService {
       });
 
     if (merchantId !== undefined) {
-      movementQueryBuilder.andWhere('product.merchantId = :merchantId', {
-        merchantId,
-      });
+      movementQueryBuilder.andWhere(
+        '(product.merchantId = :merchantId OR supply.company_id = :companyId)',
+        { merchantId, companyId },
+      );
     }
 
     const movement = await movementQueryBuilder.getOne();
@@ -209,6 +342,10 @@ export class MovementsService {
       type: movement.type,
       reference: movement.reference,
       reason: movement.reason,
+      sourceLocationId: movement.sourceLocationId,
+      destinationLocationId: movement.destinationLocationId,
+      createdBy: movement.createdBy,
+      movementType: movement.movementType,
       merchant: movement.merchant
         ? {
             id: movement.merchant.id,
@@ -339,5 +476,133 @@ export class MovementsService {
     const removedMovement = await this.movementRepository.save(movement);
 
     return this.findOne(removedMovement.id, merchantId, 'Deleted');
+  }
+
+  async depleteFromOrder(merchantId: number, orderId: number): Promise<{ success: boolean; movementsCount: number }> {
+    const order = await this.orderRepository.findOne({
+      where: { id: orderId, merchant_id: merchantId },
+      relations: ['orderItems'],
+    });
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+
+    const merchant = await this.itemRepository.manager.findOne(Merchant, {
+      where: { id: merchantId },
+      select: ['defaultSalesStockLocationId'],
+    });
+
+    let defaultLocationId = merchant?.defaultSalesStockLocationId;
+    if (!defaultLocationId) {
+      const firstLocation = await this.itemRepository.manager.findOne(Location, {
+        where: { merchantId, isActive: true },
+        order: { id: 'ASC' },
+      });
+      defaultLocationId = firstLocation?.id;
+    }
+
+
+    if (!defaultLocationId) {
+      return { success: false, movementsCount: 0 };
+    }
+
+
+    let movementsCount = 0;
+    const evaluatedStockIds = new Set<number>();
+
+    for (const orderItem of order.orderItems || []) {
+      let recipe: ProductRecipe | null = null;
+
+      if (orderItem.variant_id) {
+        recipe = await this.recipeRepository.findOne({
+          where: {
+            merchantId,
+            finishedProductId: orderItem.product_id,
+            finishedVariantId: orderItem.variant_id,
+          },
+          relations: ['lines', 'lines.rawMaterial'],
+        });
+      }
+
+      if (!recipe) {
+        recipe = await this.recipeRepository.findOne({
+          where: {
+            merchantId,
+            finishedProductId: orderItem.product_id,
+          },
+          relations: ['lines', 'lines.rawMaterial'],
+        });
+      }
+
+      if (!recipe || !recipe.lines) {
+        continue;
+      }
+
+
+
+      for (const line of recipe.lines) {
+        if (!line.rawMaterialId) {
+          continue;
+        }
+
+        const qtyPerUnit = Number(line.quantityPerSoldUnit || line.quantity || 0);
+        const quantityToDeduct = qtyPerUnit * Number(orderItem.quantity || 1);
+        if (quantityToDeduct <= 0) {
+          continue;
+        }
+
+        // Buscar el stock_item del ingrediente en el almacén de venta por defecto
+        let stockItem = await this.itemRepository.findOne({
+          where: {
+            supplyId: line.rawMaterialId,
+            locationId: defaultLocationId,
+            isActive: true,
+          },
+        });
+
+        if (!stockItem) {
+          // Si no existe el stock_item, lo creamos con cantidad 0 para que quede registro
+          stockItem = this.itemRepository.create({
+            supplyId: line.rawMaterialId,
+            locationId: defaultLocationId,
+            currentQty: 0,
+            minimumQty: 5,
+            isActive: true,
+            weightedAverageUnitCost: '0.0000',
+          });
+          stockItem = await this.itemRepository.save(stockItem);
+        }
+
+        // Decrementar el stock
+        stockItem.currentQty = Math.max(0, Number(stockItem.currentQty || 0) - quantityToDeduct);
+        await this.itemRepository.save(stockItem);
+        evaluatedStockIds.add(stockItem.id);
+
+        // Crear el movimiento de stock auditado
+        const movement = this.movementRepository.create({
+          stockItemId: stockItem.id,
+          quantity: Math.ceil(quantityToDeduct),
+          type: MovementsStatus.OUT,
+          reference: `POS Order #${order.order_number || orderId}`,
+          reason: 'Automatic recipe depletion from POS sale',
+          merchantId,
+          isActive: true,
+          sourceLocationId: defaultLocationId,
+          createdBy: 'POS System',
+          movementType: 'POS_DEPLETION',
+          orderId: order.id,
+        });
+
+
+        await this.movementRepository.save(movement);
+        movementsCount++;
+      }
+    }
+
+    if (evaluatedStockIds.size > 0) {
+      await this.stockLevelMonitor.evaluateStockItems(merchantId, Array.from(evaluatedStockIds));
+    }
+
+    return { success: true, movementsCount };
   }
 }

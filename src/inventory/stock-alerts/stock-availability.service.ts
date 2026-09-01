@@ -93,9 +93,11 @@ export class StockAvailabilityService {
 
     const byProduct = new Map<number, Item[]>();
     for (const item of items) {
-      const list = byProduct.get(item.productId) ?? [];
-      list.push(item);
-      byProduct.set(item.productId, list);
+      if (item.productId != null) {
+        const list = byProduct.get(item.productId) ?? [];
+        list.push(item);
+        byProduct.set(item.productId, list);
+      }
     }
 
     for (const pid of productIds) {
@@ -140,7 +142,9 @@ export class StockAvailabilityService {
       if (item.product?.merchantId !== merchantId) {
         continue;
       }
-      result.set(item.variantId, this.variantAvailabilityFromItem(item));
+      if (item.variantId != null) {
+        result.set(item.variantId, this.variantAvailabilityFromItem(item));
+      }
     }
     return result;
   }
