@@ -4,7 +4,9 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
+  IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -17,6 +19,26 @@ export class UpdateRecipeV1Dto {
   @Min(1)
   variantId?: number;
 
+  @ApiPropertyOptional({ example: 'Classic Burger Recipe', description: 'Recipe formula name (optional)' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Yield quantity / portions (optional)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0.0001)
+  yieldQuantity?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Active status (optional)' })
+  @IsOptional()
+  isActive?: boolean;
+
+  @ApiPropertyOptional({ example: 5.50, description: 'Total theoretical cost (optional)' })
+  @IsOptional()
+  @IsNumber()
+  totalTheoreticalCost?: number;
+
   @ApiProperty({ type: [RecipeLineV1Dto], description: 'Recipe ingredient lines' })
   @IsArray()
   @ArrayNotEmpty()
@@ -24,3 +46,4 @@ export class UpdateRecipeV1Dto {
   @Type(() => RecipeLineV1Dto)
   lines: RecipeLineV1Dto[];
 }
+

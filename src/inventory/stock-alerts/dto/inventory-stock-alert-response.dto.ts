@@ -12,11 +12,14 @@ export class InventoryStockAlertResponseDto {
   @ApiProperty()
   stockItemId: number;
 
-  @ApiProperty()
-  productId: number;
+  @ApiPropertyOptional({ nullable: true })
+  productId: number | null;
 
-  @ApiProperty()
-  variantId: number;
+  @ApiPropertyOptional({ nullable: true })
+  variantId: number | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  supplyId?: number | null;
 
   @ApiProperty()
   locationId: number;

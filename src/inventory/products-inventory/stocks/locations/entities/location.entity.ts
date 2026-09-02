@@ -20,9 +20,17 @@ export class Location {
   @Column({ type: 'varchar', length: 255 })
   name: string;
 
+  @ApiProperty({ example: 'MAIN-01', description: 'Location code' })
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  code?: string;
+
   @ApiProperty({ example: '123 Main St', description: 'Location address' })
-  @Column({ type: 'varchar', length: 255 })
-  address: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  address?: string;
+
+  @ApiProperty({ example: false, description: 'Is main storage hub' })
+  @Column({ type: 'boolean', default: false, name: 'is_main_storage' })
+  isMainStorage?: boolean;
 
   @ApiProperty({
     example: 123,

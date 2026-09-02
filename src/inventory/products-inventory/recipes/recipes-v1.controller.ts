@@ -48,7 +48,29 @@ import { ProductRecipe } from './entities/product-recipe.entity';
 export class RecipesV1Controller {
   constructor(private readonly recipesService: RecipesService) {}
 
+  @Get()
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Scopes(
+    Scope.ADMIN_PORTAL,
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @ApiOperation({
+    summary: 'Get all recipes for the authenticated merchant',
+  })
+  @ApiOkResponse({ type: ProductRecipe, isArray: true })
+  async findAllForMerchant(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ProductRecipe[]> {
+    const merchantId = user.merchant?.id;
+    if (!merchantId) throw new BadRequestException('User must have a merchant');
+    return this.recipesService.findAllForMerchant(merchantId);
+  }
+
   @Post()
+
   @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
     Scope.ADMIN_PORTAL,
