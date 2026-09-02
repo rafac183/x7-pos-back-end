@@ -74,6 +74,14 @@ export class GetKitchenDisplayDeviceQueryDto {
   createdDate?: string;
 
   @ApiPropertyOptional({
+    example: 'active',
+    description: 'Filter by status (active, deleted, or all)',
+  })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({
     example: 1,
     description: 'Page number for pagination (minimum 1)',
     minimum: 1,
