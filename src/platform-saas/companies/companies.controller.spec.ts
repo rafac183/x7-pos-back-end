@@ -1,5 +1,6 @@
 // src/platform-saas/companies/companies.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { CompaniesController } from './companies.controller';
 import { CompaniesService } from './companies.service';
 import { CreateCompanyDto } from './dtos/create-company.dto';

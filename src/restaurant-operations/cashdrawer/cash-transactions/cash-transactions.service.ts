@@ -14,7 +14,9 @@ import {
   type FindOptionsOrder,
   type FindOptionsWhere,
 } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+// Se importa desde la raíz del paquete: el `exports` de typeorm no publica la ruta
+// profunda `typeorm/query-builder/QueryPartialEntity`, así que tsc la resolvía pero jest no.
+import type { QueryDeepPartialEntity } from 'typeorm';
 import { CreateCashTransactionDto } from './dto/create-cash-transaction.dto';
 import { UpdateCashTransactionDto } from './dto/update-cash-transaction.dto';
 import {

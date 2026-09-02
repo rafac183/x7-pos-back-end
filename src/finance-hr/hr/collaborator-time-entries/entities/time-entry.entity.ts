@@ -5,6 +5,7 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Company } from 'src/platform-saas/companies/entities/company.entity';
@@ -45,13 +46,18 @@ export class TimeEntry {
   @JoinColumn({ name: 'collaborator_id' })
   collaborator: Collaborator;
 
-  @ApiProperty({ example: 1, description: 'Shift ID' })
-  @Column({ name: 'shift_id' })
-  shift_id: number;
+  @ApiProperty({
+    example: 1,
+    nullable: true,
+    description:
+      'Scheduled shift this punch belongs to. Nullable: a manually logged entry (missed punch, retroactive shift) may have no schedule behind it.',
+  })
+  @Column({ name: 'shift_id', nullable: true })
+  shift_id: number | null;
 
-  @ManyToOne(() => Shift, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Shift, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'shift_id' })
-  shift: Shift;
+  shift: Shift | null;
 
   @ApiProperty({
     example: '2024-01-15T08:00:00Z',
@@ -102,7 +108,47 @@ export class TimeEntry {
   @Column({ type: 'boolean', default: false })
   approved: boolean;
 
+  @ApiProperty({
+    example: 45,
+    description:
+      'Unpaid break minutes logged inside the punch interval. Deducted from the raw interval to get net payable hours.',
+  })
+  @Column({ type: 'int', name: 'break_minutes', default: 0 })
+  break_minutes: number;
+
+  @ApiProperty({
+    example: 'Missed Punch',
+    nullable: true,
+    description:
+      'Why the entry was logged or corrected by hand. Mandatory on every manual write; null on punches the clock itself recorded.',
+  })
+  @Column({ type: 'varchar', length: 255, name: 'adjustment_reason', nullable: true })
+  adjustment_reason: string | null;
+
+  @ApiProperty({
+    example: true,
+    description: 'True once a supervisor has corrected the punch. Never goes back to false.',
+  })
+  @Column({ type: 'boolean', name: 'is_edited', default: false })
+  is_edited: boolean;
+
+  @ApiProperty({
+    example: 7,
+    nullable: true,
+    description: 'User who performed the last correction',
+  })
+  @Column({ type: 'int', name: 'edited_by_user_id', nullable: true })
+  edited_by_user_id: number | null;
+
+  @ApiProperty({ nullable: true, description: 'When the last correction happened' })
+  @Column({ type: 'timestamp', name: 'edited_at', nullable: true })
+  edited_at: Date | null;
+
   @ApiProperty({ description: 'Creation timestamp' })
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   created_at: Date;
+
+  @ApiProperty({ description: 'Last update timestamp' })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
+  updated_at: Date;
 }

@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+// Se importa desde la raíz del paquete: el `exports` de typeorm no publica la ruta
+// profunda `typeorm/query-builder/QueryPartialEntity`, así que tsc la resolvía pero jest no.
+import type { QueryDeepPartialEntity } from 'typeorm';
 import { MarketingCouponRedemption } from './entities/marketing-coupon-redemption.entity';
 import { MarketingCoupon } from '../marketing-coupons/entities/marketing-coupon.entity';
 import { Order } from '../../../restaurant-operations/pos/orders/entities/order.entity';

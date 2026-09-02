@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { StockLevelMonitorService } from 'src/inventory/stock-alerts/stock-level-monitor.service';
+import { Supply } from 'src/inventory/supplies/entities/supply.entity';
 import { ItemsService } from './items.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -136,6 +138,36 @@ describe('ItemsService', () => {
         { provide: getRepositoryToken(Location), useValue: mockLocationRepo },
         { provide: getRepositoryToken(Variant), useValue: mockVariantRepo },
         { provide: MovementsService, useValue: mockMovementsService },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Supply),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: StockLevelMonitorService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

@@ -150,6 +150,7 @@ describe('LoyaltyProgramsController', () => {
   describe('Create', () => {
     it('should create a loyalty program', async () => {
       const createLoyaltyProgramDto: CreateLoyaltyProgramDto = {
+        redeem_points_per_currency: 1, // fixture al día con el tipo
         name: 'New Loyalty Program',
         description: 'Test Description',
         points_per_currency: 1,
@@ -178,6 +179,7 @@ describe('LoyaltyProgramsController', () => {
 
     it('should handle loyalty program name already exists', async () => {
       const createLoyaltyProgramDto: CreateLoyaltyProgramDto = {
+        redeem_points_per_currency: 1, // fixture al día con el tipo
         name: 'Existing Loyalty Program',
         description: 'Test Description',
         points_per_currency: 1,
@@ -301,6 +303,7 @@ describe('LoyaltyProgramsController', () => {
 
     it('should call service methods with correct parameters', async () => {
       const createLoyaltyProgramDto: CreateLoyaltyProgramDto = {
+        redeem_points_per_currency: 1, // fixture al día con el tipo
         name: 'Integration Test',
         description: 'Test',
         points_per_currency: 1,

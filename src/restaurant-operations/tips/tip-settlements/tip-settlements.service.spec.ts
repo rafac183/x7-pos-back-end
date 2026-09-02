@@ -1,4 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
+import { CashShift } from 'src/restaurant-operations/cashdrawer/cash-shifts/entities/cash-shift.entity';
+import { CashDrawer } from 'src/restaurant-operations/cashdrawer/cash-drawers/entities/cash-drawer.entity';
+import { MerchantTipRule } from 'src/core/configuration/merchant-tip-rule/entity/merchant-tip-rule-entity';
+import { Tip } from 'src/restaurant-operations/tips/tips/entities/tip.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { TipSettlementsService } from './tip-settlements.service';
 import { TipSettlement } from './entities/tip-settlement.entity';
@@ -80,6 +85,85 @@ describe('TipSettlementsService', () => {
         {
           provide: getRepositoryToken(Merchant),
           useValue: mockMerchantRepository,
+        },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Tip),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(MerchantTipRule),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(CashDrawer),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(CashShift),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // El servicio ejecuta transacciones; el spec nunca registró el DataSource.
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn(),
+            createQueryRunner: jest.fn(),
+            getRepository: jest.fn(),
+          },
         },
       ],
     }).compile();

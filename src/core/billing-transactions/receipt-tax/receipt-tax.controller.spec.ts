@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { ReceiptTaxController } from './receipt-tax.controller';
 import { ReceiptTaxService } from './receipt-tax.service';
 import { CreateReceiptTaxDto } from './dto/create-receipt-tax.dto';
@@ -27,7 +28,14 @@ const mockUser = {
   scope: Scope.MERCHANT_WEB,
   merchant: { id: MERCHANT_ID },
 };
-const mockRequest = mockUser;
+/**
+ * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+ * Antes esto aliasaba el usuario pelado, así que el spec verificaba un contrato
+ * que producción no cumplía.
+ */
+const mockRequest = { user: mockUser } as unknown as ExpressRequest & {
+  user?: AuthenticatedUser;
+};
 
 const mockTaxResponse: ReceiptTaxResponseDto = {
   id: 1,

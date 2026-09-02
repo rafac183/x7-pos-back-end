@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { StockAvailabilityService } from 'src/inventory/stock-alerts/stock-availability.service';
+import { PurchaseOrderItemService } from 'src/inventory/products-inventory/purchase-order-item/purchase-order-item.service';
+import { ItemsService } from 'src/inventory/products-inventory/stocks/items/items.service';
 import { ProductsService } from './products.service';
 import { Product } from './entities/product.entity';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
@@ -199,6 +202,42 @@ describe('ProductsService', () => {
         {
           provide: VariantsService,
           useValue: mockVariantsService,
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: ItemsService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: PurchaseOrderItemService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: StockAvailabilityService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
         },
       ],
     }).compile();

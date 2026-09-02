@@ -6,7 +6,9 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, Like } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+// Se importa desde la raíz del paquete: el `exports` de typeorm no publica la ruta
+// profunda `typeorm/query-builder/QueryPartialEntity`, así que tsc la resolvía pero jest no.
+import type { QueryDeepPartialEntity } from 'typeorm';
 import { OnlineMenu } from './entities/online-menu.entity';
 import { OnlineStore } from '../online-stores/entities/online-store.entity';
 import { CreateOnlineMenuDto } from './dto/create-online-menu.dto';

@@ -48,4 +48,14 @@ export class UpdateCollaboratorDto {
   @IsOptional()
   @IsEnum(CollaboratorStatus)
   status?: CollaboratorStatus;
+
+  @ApiPropertyOptional({
+    example: 3,
+    nullable: true,
+    description:
+      'Recurring shift the collaborator is attached to. Send null to detach them from their shift.',
+  })
+  @IsOptional()
+  @IsNumber()
+  shift_id?: number | null;
 }

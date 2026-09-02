@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CollaboratorContractsService } from './collaborator-contracts.service';
 import { CollaboratorContract } from './entities/collaborator-contract.entity';
+import { CollaboratorContractRevision } from './entities/collaborator-contract-revision.entity';
 import { Company } from '../../../platform-saas/companies/entities/company.entity';
 import { Merchant } from '../../../platform-saas/merchants/entities/merchant.entity';
 import { Collaborator } from '../collaborators/entities/collaborator.entity';
@@ -30,6 +31,10 @@ describe('CollaboratorContractsService', () => {
         CollaboratorContractsService,
         {
           provide: getRepositoryToken(CollaboratorContract),
+          useValue: mockRepository,
+        },
+        {
+          provide: getRepositoryToken(CollaboratorContractRevision),
           useValue: mockRepository,
         },
         { provide: getRepositoryToken(Company), useValue: mockRepository },

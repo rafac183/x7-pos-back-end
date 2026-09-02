@@ -65,6 +65,7 @@ describe('PurchaseOrderService', () => {
   } as Supplier;
 
   const mockProduct: Product = {
+    stock: 0, // fixture al día con el tipo
     id: 1,
     name: 'Test Product',
     sku: 'SKU001',
@@ -809,6 +810,7 @@ describe('PurchaseOrderService', () => {
       };
 
       const mockProductWithRelations: Product = {
+        stock: 0, // fixture al día con el tipo
         ...mockProduct,
         merchant: mockMerchant as Merchant,
         category: mockCategory,

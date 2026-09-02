@@ -9,6 +9,15 @@ import { UserRole } from 'src/platform-saas/users/constants/role.enum';
 import type { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interface';
 
 describe('SupplierInvoicesController', () => {
+  /** El controlador recibe el usuario con @CurrentUser en TODOS sus endpoints. */
+  const mockCurrentUser: AuthenticatedUser = {
+    id: 1,
+    email: 'a@b.c',
+    role: UserRole.MERCHANT_ADMIN,
+    scope: Scope.MERCHANT_WEB,
+    merchant: { id: 9, companyId: 3 },
+  };
+
   let controller: SupplierInvoicesController;
 
   const mockSupplierInvoicesService = {
@@ -64,8 +73,8 @@ describe('SupplierInvoicesController', () => {
         message: 'Supplier invoice created successfully',
         data: { id: 1, ...dto },
       });
-      await controller.create(dto);
-      expect(mockSupplierInvoicesService.create).toHaveBeenCalledWith(dto);
+      await controller.create(dto, mockCurrentUser);
+      expect(mockSupplierInvoicesService.create).toHaveBeenCalledWith(dto, 3);
     });
   });
 
@@ -107,8 +116,8 @@ describe('SupplierInvoicesController', () => {
         data: [],
         paginationMeta: {},
       });
-      await controller.findAll(query);
-      expect(mockSupplierInvoicesService.findAll).toHaveBeenCalledWith(query);
+      await controller.findAll(query, mockCurrentUser);
+      expect(mockSupplierInvoicesService.findAll).toHaveBeenCalledWith(query, 3);
     });
   });
 });

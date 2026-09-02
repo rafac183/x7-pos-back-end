@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { Variant } from 'src/inventory/products-inventory/variants/entities/variant.entity';
+import { Item } from 'src/inventory/products-inventory/stocks/items/entities/item.entity';
 import { LocationsService } from './locations.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -90,6 +92,41 @@ describe('LocationsService', () => {
         LocationsService,
         { provide: getRepositoryToken(Location), useValue: mockLocationRepo },
         { provide: getRepositoryToken(Merchant), useValue: mockMerchantRepo },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Item),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(Variant),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

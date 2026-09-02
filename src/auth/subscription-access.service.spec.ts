@@ -1,4 +1,5 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { CompanySubscription } from 'src/platform-saas/subscriptions/company-subscriptions/entities/company-subscription.entity';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { MerchantSubscription } from 'src/platform-saas/subscriptions/merchant-subscriptions/entities/merchant-subscription.entity';
@@ -55,6 +56,24 @@ describe('SubscriptionAccessService', () => {
         {
           provide: getRepositoryToken(PlanFeature),
           useValue: planFeatureRepo,
+        },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(CompanySubscription),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
         },
       ],
     }).compile();

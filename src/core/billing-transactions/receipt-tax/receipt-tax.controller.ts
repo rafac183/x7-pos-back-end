@@ -10,7 +10,9 @@ import {
   Query,
   Request,
   ParseIntPipe,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -58,6 +60,26 @@ import { ReceiptTaxScope } from './constants/receipt-tax-scope.enum';
 export class ReceiptTaxController {
   constructor(private readonly receiptTaxService: ReceiptTaxService) {}
 
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
+
   @Post()
   @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
@@ -81,9 +103,9 @@ export class ReceiptTaxController {
   })
   async create(
     @Body() dto: CreateReceiptTaxDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneReceiptTaxResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.receiptTaxService.create(dto, merchantId);
   }
 
@@ -121,9 +143,9 @@ export class ReceiptTaxController {
   @ApiForbiddenResponse({ description: 'Forbidden', type: ErrorResponse })
   async findAll(
     @Query() query: GetReceiptTaxesQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<AllPaginatedReceiptTaxes> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.receiptTaxService.findAll(query, merchantId);
   }
 
@@ -147,9 +169,9 @@ export class ReceiptTaxController {
   @ApiNotFoundResponse({ description: 'Not found', type: ErrorResponse })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneReceiptTaxResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.receiptTaxService.findOne(id, merchantId);
   }
 
@@ -175,9 +197,9 @@ export class ReceiptTaxController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateReceiptTaxDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneReceiptTaxResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.receiptTaxService.update(id, dto, merchantId);
   }
 
@@ -201,9 +223,9 @@ export class ReceiptTaxController {
   @ApiNotFoundResponse({ description: 'Not found', type: ErrorResponse })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneReceiptTaxResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.receiptTaxService.remove(id, merchantId);
   }
 }

@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { Repository, EntityManager } from 'typeorm';
+import { DataSource, Repository, EntityManager } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   NotFoundException,
@@ -18,6 +18,10 @@ import { GetTablesQueryDto } from './dto/get-tables-query.dto';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 import { FloorPlan } from '../floor-plan/entity/floor-plan.entity';
 import { FloorZone } from '../floor-zone/entity/floor-zone.entity';
+import { Order } from '../../pos/orders/entities/order.entity';
+import { TableAssignment } from '../table-assignments/entities/table-assignment.entity';
+import { TableTransferLog } from './entities/table-transfer-log.entity';
+import { DiningRealtimePublisher } from '../dining-realtime.publisher';
 
 describe('TablesService', () => {
   let service: TablesService;
@@ -30,6 +34,8 @@ describe('TablesService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),
+    // La usa la propagación de estado a las mesas hijas; por defecto, sin hijas.
+    find: jest.fn().mockResolvedValue([]),
     createQueryBuilder: jest.fn(),
   };
 
@@ -43,6 +49,41 @@ describe('TablesService', () => {
 
   const mockFloorPlanRepository = {
     findOne: jest.fn(),
+  };
+
+  // Dependencias del servicio de mesas para las guardas de servicio vivo, el traslado y el
+  // canal en vivo. Por defecto: sin comandas abiertas y sin camareros asignados.
+  const mockOrderRepository = {
+    count: jest.fn().mockResolvedValue(0),
+    findOne: jest.fn(),
+    save: jest.fn(),
+  };
+
+  const mockAssignmentQueryBuilder = {
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    getCount: jest.fn().mockResolvedValue(0),
+    getMany: jest.fn().mockResolvedValue([]),
+  };
+
+  const mockAssignmentRepository = {
+    createQueryBuilder: jest.fn(() => mockAssignmentQueryBuilder),
+    save: jest.fn(),
+  };
+
+  const mockTransferLogRepository = {
+    save: jest.fn(),
+  };
+
+  const mockDataSource = {
+    transaction: jest.fn(),
+  };
+
+  const mockRealtime = {
+    tableStatusChanged: jest.fn(),
+    tableTransferred: jest.fn(),
+    assignmentChanged: jest.fn(),
+    floorPlanUpdated: jest.fn(),
   };
 
   const mockMerchant = {
@@ -107,6 +148,26 @@ describe('TablesService', () => {
           provide: getRepositoryToken(FloorPlan),
           useValue: mockFloorPlanRepository,
         },
+        {
+          provide: getRepositoryToken(Order),
+          useValue: mockOrderRepository,
+        },
+        {
+          provide: getRepositoryToken(TableAssignment),
+          useValue: mockAssignmentRepository,
+        },
+        {
+          provide: getRepositoryToken(TableTransferLog),
+          useValue: mockTransferLogRepository,
+        },
+        {
+          provide: DataSource,
+          useValue: mockDataSource,
+        },
+        {
+          provide: DiningRealtimePublisher,
+          useValue: mockRealtime,
+        },
       ],
     }).compile();
 
@@ -125,6 +186,13 @@ describe('TablesService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockTableRepository.find.mockResolvedValue([]);
+    mockOrderRepository.count.mockResolvedValue(0);
+    mockAssignmentQueryBuilder.getCount.mockResolvedValue(0);
+    mockAssignmentQueryBuilder.getMany.mockResolvedValue([]);
+    mockAssignmentRepository.createQueryBuilder.mockReturnValue(
+      mockAssignmentQueryBuilder,
+    );
     // Reset query builder mocks
     mockQueryBuilder.getOne.mockReset();
     mockQueryBuilder.getCount.mockReset();

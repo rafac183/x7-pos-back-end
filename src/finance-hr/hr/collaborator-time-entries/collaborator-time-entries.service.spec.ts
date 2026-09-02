@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { TimeEntryRevision } from 'src/finance-hr/hr/collaborator-time-entries/entities/time-entry-revision.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CollaboratorTimeEntriesService } from './collaborator-time-entries.service';
 import { TimeEntry } from './entities/time-entry.entity';
@@ -34,6 +35,23 @@ describe('CollaboratorTimeEntriesService', () => {
         { provide: getRepositoryToken(Merchant), useValue: mockRepository },
         { provide: getRepositoryToken(Collaborator), useValue: mockRepository },
         { provide: getRepositoryToken(Shift), useValue: mockRepository },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(TimeEntryRevision),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

@@ -1,5 +1,6 @@
 // src/platform-saas/merchants/merchants.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MerchantsService } from './merchants.service';

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { ProductsInventoryService } from 'src/inventory/products-inventory/products-inventory.service';
 import { Repository, type SelectQueryBuilder } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -163,6 +164,18 @@ describe('KitchenOrderService', () => {
         {
           provide: KitchenOrderSyncService,
           useValue: mockKitchenOrderSyncService,
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: ProductsInventoryService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
         },
       ],
     }).compile();

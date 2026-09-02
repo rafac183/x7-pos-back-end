@@ -1,5 +1,6 @@
 //src/core/configuration/merchant-payroll-rule/merchant-payroll-rule.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { MerchantPayrollRuleController } from './merchant-payroll-rule.controller';
 import { MerchantPayrollRuleService } from './merchant-payroll-rule.service';
 import { MerchantPayrollRule } from './entity/merchant-payroll-rule.entity';

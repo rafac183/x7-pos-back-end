@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsDateString,
   Min,
+  IsString,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -25,9 +27,10 @@ export class CreateTimeEntryDto {
   collaborator_id: number;
 
   @ApiProperty({ example: 1, description: 'Shift ID' })
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  shift_id: number;
+  shift_id?: number | null;
 
   @ApiProperty({
     example: '2024-01-15T08:00:00.000Z',
@@ -78,4 +81,23 @@ export class CreateTimeEntryDto {
   @IsOptional()
   @IsBoolean()
   approved?: boolean;
+
+  @ApiPropertyOptional({
+    example: 45,
+    description: 'Unpaid break minutes inside the punch interval',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  break_minutes?: number;
+
+  @ApiPropertyOptional({
+    example: 'Missed Punch',
+    description:
+      'Why this entry is being logged by hand. The service requires it for every manual write.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  adjustment_reason?: string;
 }

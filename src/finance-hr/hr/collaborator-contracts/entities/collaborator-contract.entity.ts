@@ -5,12 +5,15 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Company } from 'src/platform-saas/companies/entities/company.entity';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 import { Collaborator } from '../../collaborators/entities/collaborator.entity';
 import { ContractType } from '../constants/contract-type.enum';
+import { EmploymentType } from '../constants/employment-type.enum';
+import { PayFrequency } from '../constants/pay-frequency.enum';
 
 @Entity('collaborator_contracts')
 export class CollaboratorContract {
@@ -49,6 +52,62 @@ export class CollaboratorContract {
   })
   @Column({ type: 'varchar', length: 50, name: 'contract_type' })
   contract_type: ContractType;
+
+  @ApiProperty({
+    example: EmploymentType.FULL_TIME,
+    enum: EmploymentType,
+    description:
+      'Employment relationship: full_time, part_time, temporary, freelance or internship',
+  })
+  @Column({
+    type: 'varchar',
+    length: 30,
+    name: 'employment_type',
+    default: EmploymentType.FULL_TIME,
+  })
+  employment_type: EmploymentType;
+
+  @ApiProperty({
+    example: PayFrequency.HOURLY,
+    enum: PayFrequency,
+    description: 'Period covered by the agreed wage rate',
+  })
+  @Column({
+    type: 'varchar',
+    length: 20,
+    name: 'pay_frequency',
+    default: PayFrequency.MONTHLY,
+  })
+  pay_frequency: PayFrequency;
+
+  @ApiProperty({
+    example: 40,
+    description: 'Contracted working hours per week',
+  })
+  @Column({
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    name: 'working_hours_per_week',
+    default: 40,
+  })
+  working_hours_per_week: number;
+
+  @ApiProperty({
+    example: '/uploads/contracts/12-signed.pdf',
+    description: 'Public path of the signed legal document',
+    nullable: true,
+  })
+  @Column({ type: 'varchar', length: 512, name: 'document_url', nullable: true })
+  document_url: string | null;
+
+  @ApiProperty({
+    example: 'contrato-juan-perez.pdf',
+    description: 'Original file name, kept for display and download',
+    nullable: true,
+  })
+  @Column({ type: 'varchar', length: 255, name: 'document_name', nullable: true })
+  document_name: string | null;
 
   @ApiProperty({
     example: 500000,
@@ -119,4 +178,8 @@ export class CollaboratorContract {
   @ApiProperty({ description: 'Creation timestamp' })
   @CreateDateColumn({ type: 'timestamp', name: 'created_at' })
   created_at: Date;
+
+  @ApiProperty({ description: 'Last amendment timestamp' })
+  @UpdateDateColumn({ type: 'timestamp', name: 'updated_at' })
+  updated_at: Date;
 }

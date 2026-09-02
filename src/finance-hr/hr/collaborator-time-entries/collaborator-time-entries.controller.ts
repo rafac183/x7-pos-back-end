@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -52,6 +54,26 @@ export class CollaboratorTimeEntriesController {
     private readonly collaboratorTimeEntriesService: CollaboratorTimeEntriesService,
   ) {}
 
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
+
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
   @Scopes(
@@ -74,9 +96,9 @@ export class CollaboratorTimeEntriesController {
   })
   async create(
     @Body() dto: CreateTimeEntryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneTimeEntryResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorTimeEntriesService.create(dto, merchantId);
   }
 
@@ -107,10 +129,28 @@ export class CollaboratorTimeEntriesController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async findAll(
     @Query() query: GetTimeEntryQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedTimeEntriesResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorTimeEntriesService.findAll(query, merchantId);
+  }
+
+  @Get(':id/revisions')
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @ApiOperation({
+    summary: 'Correction history for one time entry',
+    description:
+      'Every supervisor correction, newest first, with the punch values before and after. Insert-only: nothing rewrites this history, which is what makes it usable in a payroll dispute.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Time entry ID', example: 1 })
+  async revisions(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ) {
+    return this.collaboratorTimeEntriesService.revisions(
+      id,
+      this.merchantIdOf(req),
+    );
   }
 
   @Get(':id')
@@ -133,9 +173,9 @@ export class CollaboratorTimeEntriesController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneTimeEntryResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorTimeEntriesService.findOne(id, merchantId);
   }
 
@@ -161,10 +201,16 @@ export class CollaboratorTimeEntriesController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTimeEntryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneTimeEntryResponseDto> {
-    const merchantId = req.merchant?.id;
-    return this.collaboratorTimeEntriesService.update(id, dto, merchantId);
+    const merchantId = this.merchantIdOf(req);
+    // El id del supervisor viaja al servicio: es la firma de la corrección en el histórico.
+    return this.collaboratorTimeEntriesService.update(
+      id,
+      dto,
+      merchantId,
+      req.user?.id,
+    );
   }
 
   @Delete(':id')
@@ -187,9 +233,9 @@ export class CollaboratorTimeEntriesController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneTimeEntryResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorTimeEntriesService.remove(id, merchantId);
   }
 }

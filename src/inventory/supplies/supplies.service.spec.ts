@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Location } from 'src/inventory/products-inventory/stocks/locations/entities/location.entity';
+import { Item } from 'src/inventory/products-inventory/stocks/items/entities/item.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SuppliesService } from './supplies.service';
@@ -66,6 +68,41 @@ describe('SuppliesService', () => {
           provide: getRepositoryToken(Movement),
           useValue: {
             count: jest.fn(),
+          },
+        },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Item),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(Location),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
           },
         },
       ],

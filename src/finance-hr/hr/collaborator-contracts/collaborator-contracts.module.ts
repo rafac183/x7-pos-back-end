@@ -3,6 +3,7 @@ import { AuthModule } from 'src/auth/auth.module';
 
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CollaboratorContract } from './entities/collaborator-contract.entity';
+import { CollaboratorContractRevision } from './entities/collaborator-contract-revision.entity';
 import { CollaboratorContractsService } from './collaborator-contracts.service';
 import { CollaboratorContractsController } from './collaborator-contracts.controller';
 import { Company } from 'src/platform-saas/companies/entities/company.entity';
@@ -14,6 +15,7 @@ import { Collaborator } from '../collaborators/entities/collaborator.entity';
     AuthModule,
     TypeOrmModule.forFeature([
       CollaboratorContract,
+      CollaboratorContractRevision,
       Company,
       Merchant,
       Collaborator,

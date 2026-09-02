@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -57,6 +59,26 @@ export class MarketingSegmentRulesController {
   constructor(
     private readonly marketingSegmentRulesService: MarketingSegmentRulesService,
   ) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
 
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -128,9 +150,9 @@ export class MarketingSegmentRulesController {
   })
   async create(
     @Body() dto: CreateMarketingSegmentRuleDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingSegmentRuleResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingSegmentRulesService.create(
       dto,
       authenticatedUserMerchantId,
@@ -227,9 +249,9 @@ export class MarketingSegmentRulesController {
   })
   async findAll(
     @Query() query: GetMarketingSegmentRuleQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedMarketingSegmentRuleResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingSegmentRulesService.findAll(
       query,
       authenticatedUserMerchantId,
@@ -275,9 +297,9 @@ export class MarketingSegmentRulesController {
   })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingSegmentRuleResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingSegmentRulesService.findOne(
       id,
       authenticatedUserMerchantId,
@@ -347,9 +369,9 @@ export class MarketingSegmentRulesController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMarketingSegmentRuleDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingSegmentRuleResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingSegmentRulesService.update(
       id,
       dto,
@@ -400,9 +422,9 @@ export class MarketingSegmentRulesController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingSegmentRuleResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingSegmentRulesService.remove(
       id,
       authenticatedUserMerchantId,

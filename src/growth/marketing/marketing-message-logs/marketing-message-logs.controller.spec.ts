@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { MarketingMessageLogsController } from './marketing-message-logs.controller';
 import { MarketingMessageLogsService } from './marketing-message-logs.service';
 import { CreateMarketingMessageLogDto } from './dto/create-marketing-message-log.dto';
@@ -23,7 +24,7 @@ describe('MarketingMessageLogsController', () => {
     remove: jest.fn(),
   };
 
-  const mockRequest: AuthenticatedUser = {
+  const mockRequestUser: AuthenticatedUser = {
     id: 1,
     email: 'test@example.com',
     role: UserRole.MERCHANT_ADMIN,
@@ -31,6 +32,15 @@ describe('MarketingMessageLogsController', () => {
     merchant: {
       id: 1,
     },
+  };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockRequest = { user: mockRequestUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
   };
 
   const mockCreateDto: CreateMarketingMessageLogDto = {

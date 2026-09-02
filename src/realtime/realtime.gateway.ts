@@ -12,6 +12,7 @@ import { RealtimeEventBusService } from './realtime-event-bus.service';
 import { RealtimeAuthService } from './realtime-auth.service';
 import {
   companyRoom,
+  merchantRoom,
   REALTIME_CORS_ORIGIN_DEFAULT,
   REALTIME_NAMESPACE_DEFAULT,
 } from './realtime.constants';
@@ -110,9 +111,17 @@ export class RealtimeGateway
       const companyId = user.companyId;
       await client.join(companyRoom(companyId));
 
+      // Merchant room: floor-level events (dining tables, assignments, floor plans) belong
+      // to a single venue, not to every venue the company owns.
+      const merchantId = user.merchant?.id;
+      if (merchantId) {
+        await client.join(merchantRoom(merchantId));
+      }
+
       client.emit('realtime.connected', {
         userId: user.id,
         companyId,
+        merchantId,
       });
     } catch (error: unknown) {
       const message = getConnectErrorMessage(error);

@@ -1,6 +1,8 @@
+import { ForbiddenException } from '@nestjs/common';
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { ShiftAssignmentsController } from './shift-assignments.controller';
 import { ShiftAssignmentsService } from './shift-assignments.service';
 import { CreateShiftAssignmentDto } from './dto/create-shift-assignment.dto';
@@ -37,8 +39,17 @@ describe('ShiftAssignmentsController', () => {
     },
   };
 
-  const mockRequest: AuthenticatedUser = {
+  const mockRequestUser: AuthenticatedUser = {
     ...mockUser,
+  };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockRequest = { user: mockRequestUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
   };
 
   const mockShiftAssignmentResponse: OneShiftAssignmentResponseDto = {
@@ -148,7 +159,7 @@ describe('ShiftAssignmentsController', () => {
       await expect(
         controller.create(createDto, requestWithoutMerchant as any),
       ).rejects.toThrow(
-        'User must be associated with a merchant to create shift assignments',
+        'User must be associated with a merchant for this operation',
       );
     });
   });
@@ -215,7 +226,7 @@ describe('ShiftAssignmentsController', () => {
       await expect(
         controller.findAll(query, requestWithoutMerchant as any),
       ).rejects.toThrow(
-        'User must be associated with a merchant to view shift assignments',
+        'User must be associated with a merchant for this operation',
       );
     });
   });
@@ -274,7 +285,7 @@ describe('ShiftAssignmentsController', () => {
       await expect(
         controller.findOne(1, requestWithoutMerchant as any),
       ).rejects.toThrow(
-        'User must be associated with a merchant to view shift assignments',
+        'User must be associated with a merchant for this operation',
       );
     });
   });
@@ -388,7 +399,7 @@ describe('ShiftAssignmentsController', () => {
       await expect(
         controller.update(1, updateDto, requestWithoutMerchant as any),
       ).rejects.toThrow(
-        'User must be associated with a merchant to update shift assignments',
+        'User must be associated with a merchant for this operation',
       );
     });
   });
@@ -456,7 +467,7 @@ describe('ShiftAssignmentsController', () => {
       await expect(
         controller.remove(1, requestWithoutMerchant as any),
       ).rejects.toThrow(
-        'User must be associated with a merchant to delete shift assignments',
+        'User must be associated with a merchant for this operation',
       );
     });
   });

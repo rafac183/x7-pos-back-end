@@ -68,6 +68,7 @@ describe('PurchaseOrderItemService', () => {
   } as Supplier;
 
   const mockProduct: Product = {
+    stock: 0, // fixture al día con el tipo
     id: 1,
     name: 'Test Product',
     sku: 'SKU001',
@@ -128,6 +129,7 @@ describe('PurchaseOrderItemService', () => {
   } as PurchaseOrderItem;
 
   const mockCreatePurchaseOrderItemDto: CreatePurchaseOrderItemDto = {
+    locationId: 1, // fixture al día con el tipo
     purchaseOrderId: mockPurchaseOrder.id,
     productId: mockProduct.id,
     variantId: mockVariant.id,

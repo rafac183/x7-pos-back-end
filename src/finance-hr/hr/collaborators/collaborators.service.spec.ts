@@ -18,6 +18,11 @@ import { CreateCollaboratorDto } from './dto/create-collaborator.dto';
 import { UpdateCollaboratorDto } from './dto/update-collaborator.dto';
 import { GetCollaboratorsQueryDto } from './dto/get-collaborators-query.dto';
 import { CollaboratorStatus } from './constants/collaborator-status.enum';
+import { Shift } from 'src/restaurant-operations/shift/shifts/entities/shift.entity';
+import { ShiftAssignment } from 'src/restaurant-operations/shift/shift-assignments/entities/shift-assignment.entity';
+import { TableAssignment } from 'src/restaurant-operations/dining-system/table-assignments/entities/table-assignment.entity';
+import { CashDrawer } from 'src/restaurant-operations/cashdrawer/cash-drawers/entities/cash-drawer.entity';
+import { Order } from 'src/restaurant-operations/pos/orders/entities/order.entity';
 import { ShiftRole } from './constants/shift-role.enum';
 
 describe('CollaboratorsService', () => {
@@ -66,6 +71,24 @@ describe('CollaboratorsService', () => {
     user: mockUser,
   };
 
+  // Turno + las cuatro relaciones de solo lectura del resumen operativo.
+  const mockShiftRepo = { findOne: jest.fn() };
+  const mockCountRepo = () => ({
+    count: jest.fn().mockResolvedValue(0),
+    find: jest.fn().mockResolvedValue([]),
+  });
+  const mockShiftAssignmentRepo = mockCountRepo();
+  const mockTableAssignmentRepo = mockCountRepo();
+  const mockCashDrawerRepo = mockCountRepo();
+  const mockOrderRepo = {
+    ...mockCountRepo(),
+    createQueryBuilder: jest.fn(() => ({
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawOne: jest.fn().mockResolvedValue({ sum: '0' }),
+    })),
+  };
+
   const mockQueryBuilder = {
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
@@ -92,6 +115,26 @@ describe('CollaboratorsService', () => {
         {
           provide: getRepositoryToken(Merchant),
           useValue: mockMerchantRepository,
+        },
+        {
+          provide: getRepositoryToken(Shift),
+          useValue: mockShiftRepo,
+        },
+        {
+          provide: getRepositoryToken(ShiftAssignment),
+          useValue: mockShiftAssignmentRepo,
+        },
+        {
+          provide: getRepositoryToken(TableAssignment),
+          useValue: mockTableAssignmentRepo,
+        },
+        {
+          provide: getRepositoryToken(CashDrawer),
+          useValue: mockCashDrawerRepo,
+        },
+        {
+          provide: getRepositoryToken(Order),
+          useValue: mockOrderRepo,
         },
         {
           provide: EntityManager,
@@ -435,7 +478,7 @@ describe('CollaboratorsService', () => {
 
       expect(collaboratorRepository.findOne).toHaveBeenCalledWith({
         where: { id: 1 },
-        relations: ['user', 'merchant'],
+        relations: ['user', 'merchant', 'shift'],
       });
       expect(result.statusCode).toBe(200);
       expect(result.message).toBe('Collaborator retrieved successfully');
@@ -570,7 +613,7 @@ describe('CollaboratorsService', () => {
       ).rejects.toThrow(NotFoundException);
       expect(collaboratorRepository.findOne).toHaveBeenCalledWith({
         where: { id: 999 },
-        relations: ['user', 'merchant'],
+        relations: ['user', 'merchant', 'shift'],
       });
     });
 
