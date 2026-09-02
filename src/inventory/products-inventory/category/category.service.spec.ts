@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { Test, TestingModule } from '@nestjs/testing';
+import { ProductsService } from 'src/inventory/products-inventory/products/products.service';
 import { CategoryService } from './category.service';
 import { Category } from './entities/category.entity';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
@@ -105,6 +106,18 @@ describe('CategoryService', () => {
         {
           provide: ProductsInventoryService,
           useValue: mockProductsInventoryService,
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: ProductsService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
         },
       ],
     }).compile();

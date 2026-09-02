@@ -1,5 +1,6 @@
 //src/core/configuration/merchant-tip-rule/merchant-tip-rule.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { MerchantTipRuleController } from './merchant-tip-rule.controller';
 import { MerchantTipRuleService } from './merchant-tip-rule.service';
 import { MerchantTipRule } from './entity/merchant-tip-rule-entity';

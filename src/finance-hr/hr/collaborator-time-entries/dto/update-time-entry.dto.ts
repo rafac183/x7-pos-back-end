@@ -5,6 +5,8 @@ import {
   IsOptional,
   IsDateString,
   Min,
+  IsString,
+  MaxLength,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -71,4 +73,23 @@ export class UpdateTimeEntryDto {
   @IsOptional()
   @IsBoolean()
   approved?: boolean;
+
+  @ApiPropertyOptional({
+    example: 45,
+    description: 'Unpaid break minutes inside the punch interval',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  break_minutes?: number;
+
+  @ApiPropertyOptional({
+    example: 'Missed Punch',
+    description:
+      'Justification for the correction. MANDATORY: the service rejects any update that changes the punch without one, because the audit trail would lose why it changed.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  adjustment_reason?: string;
 }

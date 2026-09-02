@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { StockAvailabilityService } from 'src/inventory/stock-alerts/stock-availability.service';
 import {
   DataSource,
   Repository,
@@ -182,6 +183,18 @@ describe('OrderItemService', () => {
           useValue: mockVariantRepository,
         },
         { provide: OrdersService, useValue: mockOrdersService },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: StockAvailabilityService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

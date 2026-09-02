@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -36,6 +38,7 @@ import {
 import { AuthenticatedUser } from '../../../auth/interfaces/authenticated-user.interface';
 import { OneCollaboratorResponseDto } from './dto/collaborator-response.dto';
 import { GetCollaboratorsQueryDto } from './dto/get-collaborators-query.dto';
+import { CollaboratorSummaryResponseDto } from './dto/collaborator-summary.dto';
 import { PaginatedCollaboratorsResponseDto } from './dto/paginated-collaborators-response.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/platform-saas/users/constants/role.enum';
@@ -51,6 +54,25 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 export class CollaboratorsController {
   constructor(private readonly collaboratorsService: CollaboratorsService) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Antes esto se leía como `req.merchant?.id`
+   * —tipando el request como AuthenticatedUser, que hacía pasar el error por delante del
+   * compilador— y siempre valía undefined: el módulo entero respondía 403.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant to manage collaborators',
+      );
+    }
+    return merchantId;
+  }
 
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -194,10 +216,9 @@ export class CollaboratorsController {
   })
   async create(
     @Body() dto: CreateCollaboratorDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorResponseDto> {
-    // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     return this.collaboratorsService.create(dto, authenticatedUserMerchantId);
   }
@@ -328,15 +349,36 @@ export class CollaboratorsController {
   })
   async findAll(
     @Query() query: GetCollaboratorsQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedCollaboratorsResponseDto> {
-    // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     return this.collaboratorsService.findAll(
       query,
       authenticatedUserMerchantId,
     );
+  }
+
+  @Get(':id/summary')
+  @ApiOperation({
+    summary: 'Operational summary for one collaborator',
+    description:
+      'Counts and recent rows for everything the collaborator is bound to: shift assignments, dining table assignments, cash drawer sessions in their custody (opened and closed) and POS orders taken, plus the total sales volume. Feeds the HR detail drawer.',
+  })
+  @ApiParam({ name: 'id', type: Number, description: 'Collaborator ID', example: 1 })
+  @ApiOkResponse({
+    description: 'Summary retrieved successfully',
+    type: CollaboratorSummaryResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Invalid collaborator ID' })
+  @ApiNotFoundResponse({ description: 'Collaborator not found' })
+  @ApiForbiddenResponse({ description: 'Collaborator belongs to another merchant' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async summary(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ): Promise<CollaboratorSummaryResponseDto> {
+    return this.collaboratorsService.summary(id, this.merchantIdOf(req));
   }
 
   @Get(':id')
@@ -369,10 +411,9 @@ export class CollaboratorsController {
   @ApiBadRequestResponse({ description: 'Invalid collaborator ID' })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorResponseDto> {
-    // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     return this.collaboratorsService.findOne(id, authenticatedUserMerchantId);
   }
@@ -519,10 +560,9 @@ export class CollaboratorsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCollaboratorDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorResponseDto> {
-    // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     return this.collaboratorsService.update(
       id,
@@ -568,10 +608,9 @@ export class CollaboratorsController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorResponseDto> {
-    // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     return this.collaboratorsService.remove(id, authenticatedUserMerchantId);
   }

@@ -1,5 +1,6 @@
 //src/core/configuration/merchant-tax-rule/merchant-tax-rule.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { MerchantTaxRuleController } from './merchant-tax-rule.controller';
 import { MerchantTaxRuleService } from './merchant-tax-rule.service';
 import { MerchantTaxRule } from './entity/merchant-tax-rule.entity';

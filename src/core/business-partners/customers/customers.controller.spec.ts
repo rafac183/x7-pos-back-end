@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { CustomersController } from './customers.controller';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dtos/create-customer.dto';
@@ -33,8 +34,17 @@ describe('CustomersController', () => {
     },
   };
 
-  const mockRequest: AuthenticatedUser = {
+  const mockRequestUser: AuthenticatedUser = {
     ...mockUser,
+  };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockRequest = { user: mockRequestUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
   };
 
   const mockCustomer = {

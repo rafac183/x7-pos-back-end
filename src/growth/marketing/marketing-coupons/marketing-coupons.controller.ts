@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -58,6 +60,26 @@ export class MarketingCouponsController {
   constructor(
     private readonly marketingCouponsService: MarketingCouponsService,
   ) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
 
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -128,9 +150,9 @@ export class MarketingCouponsController {
   })
   async create(
     @Body() dto: CreateMarketingCouponDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingCouponResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingCouponsService.create(
       dto,
       authenticatedUserMerchantId,
@@ -240,9 +262,9 @@ export class MarketingCouponsController {
   })
   async findAll(
     @Query() query: GetMarketingCouponQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedMarketingCouponResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingCouponsService.findAll(
       query,
       authenticatedUserMerchantId,
@@ -284,9 +306,9 @@ export class MarketingCouponsController {
   })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingCouponResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingCouponsService.findOne(
       id,
       authenticatedUserMerchantId,
@@ -361,9 +383,9 @@ export class MarketingCouponsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMarketingCouponDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingCouponResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingCouponsService.update(
       id,
       dto,
@@ -414,9 +436,9 @@ export class MarketingCouponsController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneMarketingCouponResponseDto> {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.marketingCouponsService.remove(id, authenticatedUserMerchantId);
   }
 }

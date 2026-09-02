@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { ReceiptsController } from './receipts.controller';
 import { ReceiptsService } from './receipts.service';
 import { CreateReceiptDto } from './dto/create-receipt.dto';
@@ -40,8 +41,17 @@ describe('ReceiptsController', () => {
     },
   };
 
-  const mockRequest: AuthenticatedUser = {
+  const mockRequestUser: AuthenticatedUser = {
     ...mockUser,
+  };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockRequest = { user: mockRequestUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
   };
 
   const mockReceiptResponseData: ReceiptResponseDto = {
@@ -147,7 +157,8 @@ describe('ReceiptsController', () => {
       await expect(
         controller.create(createDto, requestWithoutMerchant as any),
       ).rejects.toThrow(ForbiddenException);
-      expect(createSpy).toHaveBeenCalledWith(createDto, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(createSpy).not.toHaveBeenCalled();
     });
 
     it('should pass merchant id from request user to service', async () => {
@@ -234,7 +245,8 @@ describe('ReceiptsController', () => {
       await expect(
         controller.findAll(query, requestWithoutMerchant as any),
       ).rejects.toThrow(ForbiddenException);
-      expect(findAllSpy).toHaveBeenCalledWith(query, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(findAllSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -279,7 +291,8 @@ describe('ReceiptsController', () => {
       await expect(
         controller.findOne(receiptId, requestWithoutMerchant as any),
       ).rejects.toThrow(ForbiddenException);
-      expect(findOneSpy).toHaveBeenCalledWith(receiptId, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(findOneSpy).not.toHaveBeenCalled();
     });
 
     it('should parse id parameter correctly', async () => {
@@ -381,7 +394,8 @@ describe('ReceiptsController', () => {
       await expect(
         controller.update(receiptId, updateDto, requestWithoutMerchant as any),
       ).rejects.toThrow(ForbiddenException);
-      expect(updateSpy).toHaveBeenCalledWith(receiptId, updateDto, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('should parse id parameter correctly', async () => {
@@ -449,7 +463,8 @@ describe('ReceiptsController', () => {
       await expect(
         controller.remove(receiptId, requestWithoutMerchant as any),
       ).rejects.toThrow(ForbiddenException);
-      expect(removeSpy).toHaveBeenCalledWith(receiptId, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(removeSpy).not.toHaveBeenCalled();
     });
 
     it('should parse id parameter correctly', async () => {

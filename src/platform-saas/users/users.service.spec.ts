@@ -1,5 +1,6 @@
 // src/platform-saas/users/users.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { MailService } from 'src/mail/mail.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UsersService } from './users.service';
@@ -66,6 +67,18 @@ describe('UsersService', () => {
         {
           provide: getRepositoryToken(Merchant),
           useValue: mockMerchantRepository,
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: MailService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
         },
       ],
     }).compile();

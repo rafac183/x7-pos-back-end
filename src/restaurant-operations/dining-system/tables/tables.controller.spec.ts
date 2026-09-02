@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TablesController } from './tables.controller';
 import { TablesService } from './tables.service';
@@ -21,6 +22,8 @@ describe('TablesController', () => {
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+    transfer: jest.fn(),
+    statusDelta: jest.fn(),
   };
 
   const mockUser = {
@@ -49,6 +52,10 @@ describe('TablesController', () => {
       location: 'Near window',
       rotation: 0,
       shape: 'Circle',
+      // null = la mesa usa el tamaño por defecto de su forma, como toda mesa anterior a
+      // que existieran estas columnas. El DTO las exige desde entonces.
+      width: null,
+      height: null,
       pos_x: 0,
       pos_y: 0,
       merchant: {
@@ -295,6 +302,60 @@ describe('TablesController', () => {
         errorMessage,
       );
       expect(removeSpy).toHaveBeenCalledWith(999, mockUser.merchant.id);
+    });
+  });
+
+  describe('POST /tables/transfer', () => {
+    it('delega el traslado con el comercio y el usuario autenticados', async () => {
+      mockTablesService.transfer.mockResolvedValue(mockTableResponse);
+
+      await controller.transfer(
+        { sourceTableId: 4, targetTableId: 9 },
+        mockRequest,
+      );
+
+      expect(service.transfer).toHaveBeenCalledWith(
+        { sourceTableId: 4, targetTableId: 9 },
+        1,
+        1,
+      );
+    });
+
+    it('rechaza a un usuario sin comercio antes de tocar el servicio', async () => {
+      await expect(
+        controller.transfer({ sourceTableId: 4, targetTableId: 9 }, {
+          user: { ...mockUser, merchant: undefined },
+        } as unknown as any),
+      ).rejects.toThrow(ForbiddenException);
+      expect(service.transfer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /tables/status-delta', () => {
+    it('pasa el instante de corte al servicio', async () => {
+      mockTablesService.statusDelta.mockResolvedValue({
+        statusCode: 200,
+        message: 'ok',
+        data: [],
+      });
+
+      await controller.statusDelta(
+        { since: '2026-08-19T10:00:00.000Z' },
+        mockRequest,
+      );
+
+      expect(service.statusDelta).toHaveBeenCalledWith(
+        { since: '2026-08-19T10:00:00.000Z' },
+        1,
+      );
+    });
+
+    it('rechaza a un usuario sin comercio', async () => {
+      await expect(
+        controller.statusDelta({}, {
+          user: { ...mockUser, merchant: undefined },
+        } as unknown as any),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

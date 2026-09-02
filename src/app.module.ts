@@ -37,6 +37,7 @@ import { SupplySupplier } from './inventory/supplies/entities/supply-supplier.en
 import { RawMaterialCategory } from './inventory/supplies/categories/entities/raw-material-category.entity';
 import { Collaborator } from './finance-hr/hr/collaborators/entities/collaborator.entity';
 import { CollaboratorContract } from './finance-hr/hr/collaborator-contracts/entities/collaborator-contract.entity';
+import { CollaboratorContractRevision } from './finance-hr/hr/collaborator-contracts/entities/collaborator-contract-revision.entity';
 import { Company } from './platform-saas/companies/entities/company.entity';
 import { Configuration } from './core/configuration/entity/configuration-entity';
 import { CompanyDefaultConfiguration } from './core/configuration/company-default/entity/company-default-configuration.entity';
@@ -127,8 +128,10 @@ import { SupplierPayment } from './finance-hr/account-payable/supplier-payments/
 import { SupplierPaymentAllocation } from './finance-hr/account-payable/supplier_payment_allocations/entities/supplier_payment_allocation.entity';
 import { SupplierPaymentItem } from './finance-hr/account-payable/supplier-payment-items/entities/supplier-payment-item.entity';
 import { Table } from './restaurant-operations/dining-system/tables/entities/table.entity';
+import { TableTransferLog } from './restaurant-operations/dining-system/tables/entities/table-transfer-log.entity';
 import { TableAssignment } from './restaurant-operations/dining-system/table-assignments/entities/table-assignment.entity';
 import { TimeEntry } from './finance-hr/hr/collaborator-time-entries/entities/time-entry.entity';
+import { TimeEntryRevision } from './finance-hr/hr/collaborator-time-entries/entities/time-entry-revision.entity';
 import { Tip } from './restaurant-operations/tips/tips/entities/tip.entity';
 import { TipAllocation } from './restaurant-operations/tips/tip-allocations/entities/tip-allocation.entity';
 import { TipPool } from './restaurant-operations/tips/tip-pools/entities/tip-pool.entity';
@@ -205,6 +208,7 @@ import { OnboardingSession } from './onboarding/entities/onboarding-session.enti
           KitchenStation,
           Collaborator,
           CollaboratorContract,
+          CollaboratorContractRevision,
           Company,
           Configuration,
           CompanyDefaultConfiguration,
@@ -290,8 +294,10 @@ import { OnboardingSession } from './onboarding/entities/onboarding-session.enti
           SupplierPaymentAllocation,
           SupplierPaymentItem,
           Table,
+          TableTransferLog,
           TableAssignment,
           TimeEntry,
+          TimeEntryRevision,
           Tip,
           TipAllocation,
           TipPool,

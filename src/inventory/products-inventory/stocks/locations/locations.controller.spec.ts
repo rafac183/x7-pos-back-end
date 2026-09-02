@@ -26,6 +26,7 @@ describe('LocationsController', () => {
   };
 
   const mockLocationResponse: LocationResponseDto = {
+    isActive: true, // fixture al día con el tipo
     id: 1,
     name: 'Test Location',
     address: '123 Test St',
@@ -168,6 +169,7 @@ describe('LocationsController', () => {
         address: '456 New Ave',
       };
       const expectedLocation: LocationResponseDto = {
+        isActive: true, // fixture al día con el tipo
         id: 10,
         name: 'New Location',
         address: '456 New Ave',
@@ -219,6 +221,7 @@ describe('LocationsController', () => {
         address: '789 Updated St',
       };
       const updatedLocationResponse: LocationResponseDto = {
+        isActive: true, // fixture al día con el tipo
         id: locationId,
         name: 'Updated Location Name',
         address: '789 Updated St',

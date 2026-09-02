@@ -12,6 +12,7 @@ import {
   ForbiddenException,
   Query,
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -57,6 +58,26 @@ export class ShiftAssignmentsController {
   constructor(
     private readonly shiftAssignmentsService: ShiftAssignmentsService,
   ) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
 
   @Post()
   @Roles(UserRole.MERCHANT_ADMIN)
@@ -207,10 +228,10 @@ export class ShiftAssignmentsController {
   })
   async create(
     @Body() dto: CreateShiftAssignmentDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneShiftAssignmentResponseDto> {
     // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     // Validate that the user has a merchant_id
     if (!authenticatedUserMerchantId) {
@@ -417,10 +438,10 @@ export class ShiftAssignmentsController {
   })
   async findAll(
     @Query() query: GetShiftAssignmentsQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedShiftAssignmentsResponseDto> {
     // Get the merchant_id from the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     // Validate that the user has merchant_id
     if (!authenticatedUserMerchantId) {
@@ -574,10 +595,10 @@ export class ShiftAssignmentsController {
   })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneShiftAssignmentResponseDto> {
     // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     // Validate that the user has a merchant_id
     if (!authenticatedUserMerchantId) {
@@ -804,10 +825,10 @@ export class ShiftAssignmentsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateShiftAssignmentDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneShiftAssignmentResponseDto> {
     // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     // Validate that the user has a merchant_id
     if (!authenticatedUserMerchantId) {
@@ -949,10 +970,10 @@ export class ShiftAssignmentsController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneShiftAssignmentResponseDto> {
     // Get the merchant_id of the authenticated user
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
 
     // Validate that the user has a merchant_id
     if (!authenticatedUserMerchantId) {

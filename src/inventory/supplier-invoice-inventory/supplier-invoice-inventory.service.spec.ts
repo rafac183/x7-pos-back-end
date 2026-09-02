@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { StockLevelMonitorService } from 'src/inventory/stock-alerts/stock-level-monitor.service';
 import { ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { SupplierInvoiceInventoryService } from './supplier-invoice-inventory.service';
@@ -46,6 +47,18 @@ describe('SupplierInvoiceInventoryService', () => {
         {
           provide: RecipeTheoreticalCostService,
           useValue: mockRecipeCost,
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: StockLevelMonitorService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
         },
       ],
     }).compile();

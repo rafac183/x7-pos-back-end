@@ -19,6 +19,12 @@ import { PaginatedCollaboratorsResponseDto } from './dto/paginated-collaborators
 import { User } from 'src/platform-saas/users/entities/user.entity';
 import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
 import { CollaboratorStatus } from './constants/collaborator-status.enum';
+import { Shift } from 'src/restaurant-operations/shift/shifts/entities/shift.entity';
+import { ShiftAssignment } from 'src/restaurant-operations/shift/shift-assignments/entities/shift-assignment.entity';
+import { TableAssignment } from 'src/restaurant-operations/dining-system/table-assignments/entities/table-assignment.entity';
+import { CashDrawer } from 'src/restaurant-operations/cashdrawer/cash-drawers/entities/cash-drawer.entity';
+import { Order } from 'src/restaurant-operations/pos/orders/entities/order.entity';
+import { CollaboratorSummaryResponseDto } from './dto/collaborator-summary.dto';
 
 @Injectable()
 export class CollaboratorsService {
@@ -29,6 +35,18 @@ export class CollaboratorsService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Merchant)
     private readonly merchantRepo: Repository<Merchant>,
+    @InjectRepository(Shift)
+    private readonly shiftRepo: Repository<Shift>,
+    // Sólo lectura: alimentan el resumen operativo del colaborador. Cada una de estas
+    // entidades sigue perteneciendo a su propio módulo.
+    @InjectRepository(ShiftAssignment)
+    private readonly shiftAssignmentRepo: Repository<ShiftAssignment>,
+    @InjectRepository(TableAssignment)
+    private readonly tableAssignmentRepo: Repository<TableAssignment>,
+    @InjectRepository(CashDrawer)
+    private readonly cashDrawerRepo: Repository<CashDrawer>,
+    @InjectRepository(Order)
+    private readonly orderRepo: Repository<Order>,
     private readonly entityManager: EntityManager,
   ) {}
 
@@ -92,12 +110,17 @@ export class CollaboratorsService {
     }
 
     // 7. Crear el colaborador
+    // El turno es opcional y tiene que ser del MISMO comercio: sin esta comprobación se
+    // podría enganchar a un empleado al turno de otro local pasando un id a mano.
+    const shift = await this.resolveShift(dto.shift_id, dto.merchant_id);
+
     const collaborator = this.collaboratorRepo.create({
       user_id: dto.user_id,
       merchant_id: dto.merchant_id,
       name: dto.name.trim(),
       role: dto.role,
       status: dto.status,
+      shift_id: shift?.id ?? null,
     } as Partial<Collaborator>);
 
     const savedCollaborator = await this.collaboratorRepo.save(collaborator);
@@ -106,22 +129,73 @@ export class CollaboratorsService {
     return {
       statusCode: 201,
       message: 'Collaborator created successfully',
-      data: {
-        id: savedCollaborator.id,
-        user_id: savedCollaborator.user_id,
-        merchant_id: savedCollaborator.merchant_id,
-        name: savedCollaborator.name,
-        role: savedCollaborator.role,
-        status: savedCollaborator.status,
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-        },
-        user: {
-          id: user.id,
-          firstname: user.username || '',
-          lastname: user.email || '',
-        },
+      data: this.toResponse(savedCollaborator, merchant, user, shift),
+    };
+  }
+
+  /**
+   * Turno del colaborador. Devuelve null tanto si no se pidió ninguno como si se pidió
+   * desengancharlo (null explícito), y revienta si el turno es de otro comercio.
+   */
+  private async resolveShift(
+    shiftId: number | null | undefined,
+    merchantId: number,
+  ): Promise<Shift | null> {
+    if (shiftId === undefined || shiftId === null) return null;
+    const shift = await this.shiftRepo.findOne({ where: { id: shiftId } });
+    if (!shift) {
+      throw new NotFoundException(`Shift with ID ${shiftId} not found`);
+    }
+    if (shift.merchantId !== merchantId) {
+      throw new ForbiddenException(
+        'You can only assign shifts that belong to your own merchant',
+      );
+    }
+    return shift;
+  }
+
+  /**
+   * Forma única de la respuesta.
+   *
+   * `firstname`/`lastname` se conservan porque el mapeo original metía ahí el username y el
+   * email —cualquier cliente que ya lea esos campos seguiría funcionando— pero se añaden
+   * `username` y `email` con su nombre real: buscar empleados por correo requería adivinar
+   * que el correo viajaba en el apellido.
+   */
+  private toResponse(
+    collaborator: Collaborator,
+    merchant: { id: number; name: string },
+    user: { id: number; username?: string; email?: string },
+    shift?: Shift | null,
+  ): CollaboratorResponseDto {
+    const resolvedShift = shift ?? collaborator.shift ?? null;
+    return {
+      id: collaborator.id,
+      user_id: collaborator.user_id,
+      merchant_id: collaborator.merchant_id,
+      name: collaborator.name,
+      role: collaborator.role,
+      status: collaborator.status,
+      employeeId: collaborator.employeeId ?? null,
+      department: collaborator.department ?? null,
+      created_at: collaborator.created_at,
+      shift_id: resolvedShift?.id ?? collaborator.shift_id ?? null,
+      shift: resolvedShift
+        ? {
+            id: resolvedShift.id,
+            role: resolvedShift.role ?? null,
+            startTime: resolvedShift.startTime ?? null,
+            endTime: resolvedShift.endTime ?? null,
+            status: resolvedShift.status ?? null,
+          }
+        : null,
+      merchant: { id: merchant.id, name: merchant.name },
+      user: {
+        id: user.id,
+        firstname: user.username || '',
+        lastname: user.email || '',
+        username: user.username || '',
+        email: user.email || '',
       },
     };
   }
@@ -157,6 +231,7 @@ export class CollaboratorsService {
       .createQueryBuilder('collaborator')
       .leftJoinAndSelect('collaborator.user', 'user')
       .leftJoinAndSelect('collaborator.merchant', 'merchant')
+      .leftJoinAndSelect('collaborator.shift', 'shift')
       .where('merchant.id = :merchantId', {
         merchantId: authenticatedUserMerchantId,
       });
@@ -184,24 +259,8 @@ export class CollaboratorsService {
     const hasPrev = page > 1;
 
     // 9. Mapear a CollaboratorResponseDto (sin fechas, con info del merchant y user)
-    const data: CollaboratorResponseDto[] = collaborators.map(
-      (collaborator) => ({
-        id: collaborator.id,
-        user_id: collaborator.user_id,
-        merchant_id: collaborator.merchant_id,
-        name: collaborator.name,
-        role: collaborator.role,
-        status: collaborator.status,
-        merchant: {
-          id: collaborator.merchant.id,
-          name: collaborator.merchant.name,
-        },
-        user: {
-          id: collaborator.user.id,
-          firstname: collaborator.user.username || '',
-          lastname: collaborator.user.email || '',
-        },
-      }),
+    const data: CollaboratorResponseDto[] = collaborators.map((collaborator) =>
+      this.toResponse(collaborator, collaborator.merchant, collaborator.user),
     );
 
     return {
@@ -238,7 +297,7 @@ export class CollaboratorsService {
     // 3. Buscar el colaborador
     const collaborator = await this.collaboratorRepo.findOne({
       where: { id },
-      relations: ['user', 'merchant'],
+      relations: ['user', 'merchant', 'shift'],
     });
 
     if (!collaborator) {
@@ -276,23 +335,7 @@ export class CollaboratorsService {
     return {
       statusCode: 200,
       message: 'Collaborator retrieved successfully',
-      data: {
-        id: collaborator.id,
-        user_id: collaborator.user_id,
-        merchant_id: collaborator.merchant_id,
-        name: collaborator.name,
-        role: collaborator.role,
-        status: collaborator.status,
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-        },
-        user: {
-          id: user.id,
-          firstname: user.username || '',
-          lastname: user.email || '',
-        },
-      },
+      data: this.toResponse(collaborator, merchant, user),
     };
   }
 
@@ -331,7 +374,7 @@ export class CollaboratorsService {
     // 3. Buscar el colaborador existente
     const collaborator = await this.collaboratorRepo.findOne({
       where: { id },
-      relations: ['user', 'merchant'],
+      relations: ['user', 'merchant', 'shift'],
     });
 
     if (!collaborator) {
@@ -398,6 +441,12 @@ export class CollaboratorsService {
     if (dto.name !== undefined) updateData.name = dto.name.trim();
     if (dto.role !== undefined) updateData.role = dto.role;
     if (dto.status !== undefined) updateData.status = dto.status;
+    // null explícito = desenganchar del turno. `undefined` (campo ausente) lo deja como está,
+    // que es lo que espera cualquier cliente que mande sólo los campos que tocó.
+    if (dto.shift_id !== undefined) {
+      const shift = await this.resolveShift(dto.shift_id, collaborator.merchant_id);
+      updateData.shift_id = shift?.id ?? null;
+    }
 
     // 10. Verificar que hay al menos un campo para actualizar
     if (Object.keys(updateData).length === 0) {
@@ -424,23 +473,7 @@ export class CollaboratorsService {
     return {
       statusCode: 200,
       message: 'Collaborator updated successfully',
-      data: {
-        id: updatedCollaborator.id,
-        user_id: updatedCollaborator.user_id,
-        merchant_id: updatedCollaborator.merchant_id,
-        name: updatedCollaborator.name,
-        role: updatedCollaborator.role,
-        status: updatedCollaborator.status,
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
-        },
-        user: {
-          id: user.id,
-          firstname: user.username || '',
-          lastname: user.email || '',
-        },
-      },
+      data: this.toResponse(updatedCollaborator, merchant, user),
     };
   }
 
@@ -463,7 +496,7 @@ export class CollaboratorsService {
     // 3. Buscar el colaborador
     const collaborator = await this.collaboratorRepo.findOne({
       where: { id },
-      relations: ['user', 'merchant'],
+      relations: ['user', 'merchant', 'shift'],
     });
 
     if (!collaborator) {
@@ -518,22 +551,144 @@ export class CollaboratorsService {
     return {
       statusCode: 200,
       message: 'Collaborator deleted successfully',
+      data: this.toResponse(updatedCollaborator, merchant, user),
+    };
+  }
+
+  /**
+   * Resumen operativo del colaborador: turnos, mesas, cajas y comandas.
+   *
+   * Los contadores salen de cinco COUNT en paralelo en vez de traerse las colecciones y
+   * medirlas en memoria: un camarero veterano acumula miles de comandas y el cajón sólo
+   * necesita el número y las últimas cinco.
+   */
+  async summary(
+    id: number,
+    authenticatedUserMerchantId: number,
+  ): Promise<CollaboratorSummaryResponseDto> {
+    if (!authenticatedUserMerchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant to view collaborators',
+      );
+    }
+    if (!id || id <= 0 || !Number.isInteger(id)) {
+      throw new BadRequestException('Invalid collaborator ID');
+    }
+
+    const collaborator = await this.collaboratorRepo.findOne({ where: { id } });
+    if (!collaborator) {
+      throw new NotFoundException(`Collaborator with ID ${id} not found`);
+    }
+    // Aislamiento multi-tenant: el resumen de un empleado ajeno no se enseña ni por id.
+    if (collaborator.merchant_id !== authenticatedUserMerchantId) {
+      throw new ForbiddenException(
+        'You can only view collaborators from your own merchant',
+      );
+    }
+
+    const [
+      shiftAssignments,
+      tableAssignments,
+      openedCashDrawers,
+      closedCashDrawers,
+      orders,
+    ] = await Promise.all([
+      this.shiftAssignmentRepo.count({ where: { collaboratorId: id } }),
+      this.tableAssignmentRepo.count({ where: { collaboratorId: id } }),
+      this.cashDrawerRepo.count({ where: { opened_by: id } }),
+      this.cashDrawerRepo.count({ where: { closed_by: id } }),
+      this.orderRepo.count({ where: { collaborator_id: id } }),
+    ]);
+
+    const [recentShifts, recentTables, recentOpened, recentClosed, recentOrders] =
+      await Promise.all([
+        this.shiftAssignmentRepo.find({
+          where: { collaboratorId: id },
+          order: { id: 'DESC' },
+          take: 5,
+        }),
+        this.tableAssignmentRepo.find({
+          where: { collaboratorId: id },
+          order: { id: 'DESC' },
+          take: 5,
+        }),
+        this.cashDrawerRepo.find({
+          where: { opened_by: id },
+          order: { id: 'DESC' },
+          take: 5,
+        }),
+        this.cashDrawerRepo.find({
+          where: { closed_by: id },
+          order: { id: 'DESC' },
+          take: 5,
+        }),
+        this.orderRepo.find({
+          where: { collaborator_id: id },
+          order: { id: 'DESC' },
+          take: 5,
+        }),
+      ]);
+
+    // El volumen se suma en la base: traerse todas las comandas para sumarlas aquí sería
+    // pasear el histórico entero por la red para obtener un número.
+    const totalRow = await this.orderRepo
+      .createQueryBuilder('order')
+      .select('COALESCE(SUM(order.total), 0)', 'sum')
+      .where('order.collaborator_id = :id', { id })
+      .getRawOne<{ sum: string }>();
+
+    return {
+      statusCode: 200,
+      message: 'Collaborator summary retrieved successfully',
       data: {
-        id: updatedCollaborator.id,
-        user_id: updatedCollaborator.user_id,
-        merchant_id: updatedCollaborator.merchant_id,
-        name: updatedCollaborator.name,
-        role: updatedCollaborator.role,
-        status: updatedCollaborator.status,
-        merchant: {
-          id: merchant.id,
-          name: merchant.name,
+        collaborator_id: id,
+        counts: {
+          shiftAssignments,
+          tableAssignments,
+          openedCashDrawers,
+          closedCashDrawers,
+          orders,
         },
-        user: {
-          id: user.id,
-          firstname: user.username || '',
-          lastname: user.email || '',
-        },
+        ordersTotal: Number(totalRow?.sum ?? 0),
+        recentShiftAssignments: recentShifts.map((a) => ({
+          id: a.id,
+          shiftId: a.shiftId,
+          startTime: a.startTime ?? null,
+          endTime: a.endTime ?? null,
+          status: a.status ?? null,
+        })),
+        recentTableAssignments: recentTables.map((a) => ({
+          id: a.id,
+          tableId: a.tableId,
+          // `table` es eager en TableAssignment, así que el número viene sin pedir join.
+          tableNumber: a.table?.number ?? null,
+          zoneName: a.table?.floorZone?.name ?? null,
+          assignedAt: a.assignedAt ?? null,
+          releasedAt: a.releasedAt ?? null,
+        })),
+        recentCashDrawers: [
+          ...recentOpened.map((d) => ({
+            id: d.id,
+            custody: 'opened' as const,
+            status: d.status ?? null,
+            createdAt: d.created_at ?? null,
+            updatedAt: d.updated_at ?? null,
+          })),
+          ...recentClosed.map((d) => ({
+            id: d.id,
+            custody: 'closed' as const,
+            status: d.status ?? null,
+            createdAt: d.created_at ?? null,
+            updatedAt: d.updated_at ?? null,
+          })),
+        ].slice(0, 5),
+        recentOrders: recentOrders.map((o) => ({
+          id: o.id,
+          order_number: o.order_number ?? null,
+          total: Number(o.total ?? 0),
+          status: o.status ?? null,
+          created_at: o.created_at ?? null,
+        })),
       },
     };
   }

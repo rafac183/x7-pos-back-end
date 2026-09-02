@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -55,6 +57,26 @@ import { ErrorResponse } from 'src/common/dtos/error-response.dto';
 export class TipPoolsController {
   constructor(private readonly tipPoolsService: TipPoolsService) {}
 
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
+
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
   @Scopes(
@@ -76,9 +98,9 @@ export class TipPoolsController {
   @ApiBody({ type: CreateTipPoolDto })
   async create(
     @Body() dto: CreateTipPoolDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.tipPoolsService.create(dto, req.merchant?.id);
+    return this.tipPoolsService.create(dto, this.merchantIdOf(req));
   }
 
   @Get()
@@ -106,9 +128,9 @@ export class TipPoolsController {
   @ApiBadRequestResponse({ type: ErrorResponse })
   async findAll(
     @Query() query: GetTipPoolQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.tipPoolsService.findAll(query, req.merchant?.id);
+    return this.tipPoolsService.findAll(query, this.merchantIdOf(req));
   }
 
   @Get(':id')
@@ -129,9 +151,9 @@ export class TipPoolsController {
   @ApiBadRequestResponse({ type: ErrorResponse })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.tipPoolsService.findOne(id, req.merchant?.id);
+    return this.tipPoolsService.findOne(id, this.merchantIdOf(req));
   }
 
   @Put(':id')
@@ -154,9 +176,9 @@ export class TipPoolsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTipPoolDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.tipPoolsService.update(id, dto, req.merchant?.id);
+    return this.tipPoolsService.update(id, dto, this.merchantIdOf(req));
   }
 
   @Delete(':id')
@@ -178,8 +200,8 @@ export class TipPoolsController {
   @ApiConflictResponse({ type: ErrorResponse })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.tipPoolsService.remove(id, req.merchant?.id);
+    return this.tipPoolsService.remove(id, this.merchantIdOf(req));
   }
 }

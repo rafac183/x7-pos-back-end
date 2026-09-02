@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { ReceiptItemController } from './receipt-item.controller';
 import { ReceiptItemService } from './receipt-item.service';
 import { CreateReceiptItemDto } from './dto/create-receipt-item.dto';
@@ -12,13 +13,22 @@ import { AuthenticatedUser } from 'src/auth/interfaces/authenticated-user.interf
 
 const MERCHANT_ID = 1;
 
-const mockReq: AuthenticatedUser = {
+const mockReqUser: AuthenticatedUser = {
   id: 1,
   email: 'test@example.com',
   role: UserRole.MERCHANT_ADMIN,
   scope: Scope.MERCHANT_WEB,
   merchant: { id: MERCHANT_ID },
 };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockReq = { user: mockReqUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
+  };
 
 const mockOneResponse: OneReceiptItemResponseDto = {
   statusCode: 200,

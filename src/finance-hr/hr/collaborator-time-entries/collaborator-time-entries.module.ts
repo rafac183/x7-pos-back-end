@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TimeEntryRevision } from './entities/time-entry-revision.entity';
 import { AuthModule } from 'src/auth/auth.module';
 
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -14,6 +15,8 @@ import { Shift } from 'src/restaurant-operations/shift/shifts/entities/shift.ent
   imports: [
     AuthModule,
     TypeOrmModule.forFeature([
+      // Histórico inmutable de correcciones de fichaje.
+      TimeEntryRevision,
       TimeEntry,
       Company,
       Merchant,

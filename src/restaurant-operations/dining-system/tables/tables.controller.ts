@@ -22,6 +22,8 @@ import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { OneTableResponseDto } from './dto/table-response.dto';
 import { GetTablesQueryDto } from './dto/get-tables-query.dto';
+import { TransferTableDto } from './dto/transfer-table.dto';
+import { StatusDeltaQueryDto } from './dto/status-delta-query.dto';
 import { PaginatedTablesResponseDto } from './dto/paginated-tables-response.dto';
 import {
   ApiTags,
@@ -177,6 +179,90 @@ export class TablesController {
     }
 
     return this.tableService.create(dto, authenticatedUserMerchantId);
+  }
+
+  @Post('transfer')
+  @Roles(UserRole.MERCHANT_ADMIN)
+  @Scopes(
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @ApiOperation({
+    summary: 'Transfer a seated party to another table',
+    description:
+      'Moves the open check, the guest party and the serving collaborator from one table to another in a single transaction. The source table is released to cleaning and the target is marked occupied. The target must be available; occupied, reserved, cleaning or out-of-service tables are rejected. Every transfer is written to the audit log.',
+  })
+  @ApiBody({ type: TransferTableDto })
+  @ApiOkResponse({
+    description: 'Party transferred successfully; returns the target table',
+    type: OneTableResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Source and target must be different' })
+  @ApiConflictResponse({
+    description: 'Target table is not available, or source has no seated party',
+  })
+  @ApiNotFoundResponse({ description: 'Source or target table not found' })
+  @ApiForbiddenResponse({ description: 'Tables belong to another merchant' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async transfer(
+    @Body() dto: TransferTableDto,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ): Promise<OneTableResponseDto> {
+    const authenticatedUser = req.user as AuthenticatedUser | undefined;
+    const authenticatedUserMerchantId = authenticatedUser?.merchant?.id;
+
+    if (!authenticatedUserMerchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant to transfer tables',
+      );
+    }
+
+    return this.tableService.transfer(
+      dto,
+      authenticatedUserMerchantId,
+      authenticatedUser?.id as number,
+    );
+  }
+
+  @Get('status-delta')
+  @Roles(UserRole.MERCHANT_ADMIN)
+  @Scopes(
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @ApiOperation({
+    summary: 'Tables touched since a given instant',
+    description:
+      'Reconciliation endpoint for terminals coming back from a network drop: returns only the tables updated after `since`, deleted ones included so the client can drop them from its floor map. Omitting `since` returns the whole floor.',
+  })
+  @ApiQuery({
+    name: 'since',
+    required: false,
+    type: String,
+    description: 'ISO-8601 instant; defaults to the whole floor when omitted',
+    example: '2026-08-19T12:00:00.000Z',
+  })
+  @ApiOkResponse({ description: 'Delta retrieved successfully' })
+  @ApiBadRequestResponse({ description: 'Invalid `since` timestamp' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async statusDelta(
+    @Query() query: StatusDeltaQueryDto,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ) {
+    const authenticatedUser = req.user as AuthenticatedUser | undefined;
+    const authenticatedUserMerchantId = authenticatedUser?.merchant?.id;
+
+    if (!authenticatedUserMerchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant to read table status',
+      );
+    }
+
+    return this.tableService.statusDelta(query, authenticatedUserMerchantId);
   }
 
   @Get()

@@ -8,7 +8,7 @@ import {
   MinLength,
   MaxLength,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ShiftRole } from '../constants/shift-role.enum';
 import { CollaboratorStatus } from '../constants/collaborator-status.enum';
 
@@ -71,4 +71,15 @@ export class CreateCollaboratorDto {
   })
   @IsEnum(CollaboratorStatus)
   status: CollaboratorStatus;
+
+  @ApiPropertyOptional({
+    example: 3,
+    nullable: true,
+    description:
+      'Recurring shift the collaborator is attached to. Omit or send null to leave them unassigned.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  shift_id?: number | null;
 }

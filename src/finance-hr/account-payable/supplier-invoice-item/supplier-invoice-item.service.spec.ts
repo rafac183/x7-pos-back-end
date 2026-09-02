@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Merchant } from 'src/platform-saas/merchants/entities/merchant.entity';
+import { Variant } from 'src/inventory/products-inventory/variants/entities/variant.entity';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { SupplierInvoiceItemService } from './supplier-invoice-item.service';
 import { SupplierInvoiceItem } from './entities/supplier-invoice-item.entity';
@@ -33,6 +35,41 @@ describe('SupplierInvoiceItemService', () => {
         {
           provide: getRepositoryToken(Product),
           useValue: productRepoMock,
+        },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Variant),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
+        },
+      
+        {
+          // Dependencia que el servicio ganó y este spec nunca registró.
+          provide: getRepositoryToken(Merchant),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
         },
       ],
     }).compile();

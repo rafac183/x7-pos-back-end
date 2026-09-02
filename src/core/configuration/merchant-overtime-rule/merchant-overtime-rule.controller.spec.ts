@@ -1,5 +1,6 @@
 //src/core/configuration/merchant-overtime-rule/merchant-overtime-rule.controller.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
+import { CompanyStatus } from 'src/platform-saas/companies/constants/company-status.enum';
 import { MerchantOvertimeRuleController } from './merchant-overtime-rule.controller';
 import { MerchantOvertimeRuleService } from './merchant-overtime-rule.service';
 import { MerchantOvertimeRule } from './entity/merchant-overtime-rule.entity';

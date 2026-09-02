@@ -1,4 +1,6 @@
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { Request as ExpressRequest } from 'express';
 import { MarketingAutomationActionsController } from './marketing-automation-actions.controller';
 import { MarketingAutomationActionsService } from './marketing-automation-actions.service';
 import { CreateMarketingAutomationActionDto } from './dto/create-marketing-automation-action.dto';
@@ -64,8 +66,17 @@ describe('MarketingAutomationActionsController', () => {
     },
   };
 
-  const mockRequest: AuthenticatedUser = {
+  const mockRequestUser: AuthenticatedUser = {
     ...mockUser,
+  };
+
+  /**
+   * Forma REAL del request: Passport cuelga el usuario en `req.user`.
+   * Pasar el usuario pelado hacía que el spec verificara un contrato que
+   * producción no cumple, y por eso el 403 del módulo pasó desapercibido.
+   */
+  const mockRequest = { user: mockRequestUser } as unknown as ExpressRequest & {
+    user?: AuthenticatedUser;
   };
 
   beforeEach(async () => {
@@ -134,9 +145,10 @@ describe('MarketingAutomationActionsController', () => {
 
       service.create.mockResolvedValue(mockMarketingAutomationActionResponse);
 
-      await controller.create(createDto, reqWithoutMerchant as any);
+      await expect(controller.create(createDto, reqWithoutMerchant as any)).rejects.toThrow(ForbiddenException);
 
-      expect(service.create).toHaveBeenCalledWith(createDto, undefined);
+      // El controlador rechaza el token sin comercio ANTES de tocar el servicio.
+      expect(service.create).not.toHaveBeenCalled();
     });
   });
 

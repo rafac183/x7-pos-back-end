@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   ParseIntPipe,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -43,6 +45,42 @@ import { ErrorResponse } from 'src/common/dtos/error-response.dto';
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
+  /**
+   * Usuario autenticado completo. Este servicio recibe el usuario, no sólo su comercio,
+   * así que hace falta el objeto entero — y sigue viniendo de `req.user`.
+   */
+  private userOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): AuthenticatedUser {
+    const user = req.user;
+    if (!user?.merchant?.id) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return user;
+  }
+
+
   @Post()
   @ApiOperation({ summary: 'Create a new customer' })
   @ApiResponse({
@@ -65,8 +103,8 @@ export class CustomersController {
   // 'portal_admin', 'portal_user', 'merchant_admin', 'merchant_user'
   @ApiBody({ type: CreateCustomerDto })
   @Roles('portal_admin', 'merchant_admin', 'customer_admin')
-  create(@Body() dto: CreateCustomerDto, @Request() req: AuthenticatedUser) {
-    return this.customersService.create(dto, req);
+  create(@Body() dto: CreateCustomerDto, @Request() req: ExpressRequest & { user?: AuthenticatedUser }) {
+    return this.customersService.create(dto, this.userOf(req));
   }
 
   @Get()
@@ -138,9 +176,9 @@ export class CustomersController {
   )
   findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.customersService.findOne(id, req);
+    return this.customersService.findOne(id, this.userOf(req));
   }
 
   @Patch(':id')
@@ -188,9 +226,9 @@ export class CustomersController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCustomerDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.customersService.update(id, dto, req);
+    return this.customersService.update(id, dto, this.userOf(req));
   }
 
   @Delete(':id')
@@ -224,8 +262,8 @@ export class CustomersController {
   @Roles('portal_admin', 'merchant_admin', 'customer_admin')
   remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    return this.customersService.remove(id, req);
+    return this.customersService.remove(id, this.userOf(req));
   }
 }

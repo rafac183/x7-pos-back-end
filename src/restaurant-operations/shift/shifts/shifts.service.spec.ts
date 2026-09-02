@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 
 import { Test, TestingModule } from '@nestjs/testing';
+import { Collaborator } from 'src/finance-hr/hr/collaborators/entities/collaborator.entity';
 import { Repository, EntityManager, Not } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -80,6 +81,24 @@ describe('ShiftsService', () => {
         {
           provide: EntityManager,
           useValue: mockEntityManager,
+        },
+      
+        {
+          // El servicio ganó esta dependencia y el spec nunca la registró: el módulo
+          // de pruebas no compilaba y la suite entera contaba como fallo.
+          provide: getRepositoryToken(Collaborator),
+          useValue: {
+            find: jest.fn(),
+            findOne: jest.fn(),
+            findAndCount: jest.fn(),
+            findBy: jest.fn(),
+            save: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            count: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
         },
       ],
     }).compile();

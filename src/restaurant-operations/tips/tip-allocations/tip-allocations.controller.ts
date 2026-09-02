@@ -10,7 +10,9 @@ import {
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -55,6 +57,26 @@ import { TipAllocationRole } from './constants/tip-allocation-role.enum';
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 export class TipAllocationsController {
   constructor(private readonly tipAllocationsService: TipAllocationsService) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
 
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -106,9 +128,9 @@ export class TipAllocationsController {
   })
   async create(
     @Body() dto: CreateTipAllocationDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.tipAllocationsService.create(dto, authenticatedUserMerchantId);
   }
 
@@ -156,9 +178,9 @@ export class TipAllocationsController {
   })
   async findAll(
     @Query() query: GetTipAllocationQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.tipAllocationsService.findAll(
       query,
       authenticatedUserMerchantId,
@@ -193,9 +215,9 @@ export class TipAllocationsController {
   @ApiBadRequestResponse({ description: 'Invalid ID', type: ErrorResponse })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.tipAllocationsService.findOne(id, authenticatedUserMerchantId);
   }
 
@@ -238,9 +260,9 @@ export class TipAllocationsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateTipAllocationDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.tipAllocationsService.update(
       id,
       dto,
@@ -284,9 +306,9 @@ export class TipAllocationsController {
   })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
-    const authenticatedUserMerchantId = req.merchant?.id;
+    const authenticatedUserMerchantId = this.merchantIdOf(req);
     return this.tipAllocationsService.remove(id, authenticatedUserMerchantId);
   }
 }

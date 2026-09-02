@@ -5,12 +5,22 @@ import {
   Body,
   Param,
   Put,
+  Patch,
   Delete,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  PayloadTooLargeException,
   ParseIntPipe,
   UseGuards,
   Request,
   Query,
+  ForbiddenException
 } from '@nestjs/common';
+import { Request as ExpressRequest } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { extname, join } from 'path';
+import { mkdirSync, writeFileSync } from 'fs';
 import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
 import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
@@ -32,9 +42,19 @@ import {
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiBadRequestResponse,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { AuthenticatedUser } from '../../../auth/interfaces/authenticated-user.interface';
-import { OneCollaboratorContractResponseDto } from './dto/collaborator-contract-response.dto';
+import {
+  ContractRevisionsResponseDto,
+  OneCollaboratorContractResponseDto,
+} from './dto/collaborator-contract-response.dto';
+import {
+  ALLOWED_CONTRACT_DOCUMENT_EXTENSIONS,
+  ALLOWED_CONTRACT_DOCUMENT_MIME_TYPES,
+  CONTRACT_DOCUMENT_DIR,
+  MAX_CONTRACT_DOCUMENT_BYTES,
+} from './constants/contract-document.constants';
 import { PaginatedCollaboratorContractsResponseDto } from './dto/paginated-collaborator-contracts-response.dto';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/platform-saas/users/constants/role.enum';
@@ -42,6 +62,29 @@ import { Scope } from 'src/platform-saas/users/constants/scope.enum';
 import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+
+/**
+ * Fichero subido, con los campos que da el almacenamiento en memoria.
+ *
+ * Se declara aquí porque el proyecto no incluye `@types/multer`, y el adjunto se escribe a
+ * disco a mano en lugar de con `diskStorage` para no depender de esos tipos.
+ */
+interface UploadedContractDocument {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer: Buffer;
+}
+
+/** Persiste el adjunto bajo `uploads/contracts`, que main.ts ya sirve como estático. */
+function storeContractDocument(file: UploadedContractDocument): string {
+  const dir = join(process.cwd(), CONTRACT_DOCUMENT_DIR);
+  mkdirSync(dir, { recursive: true });
+  const ext = extname(file.originalname).toLowerCase();
+  const filename = `contract-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+  writeFileSync(join(dir, filename), file.buffer);
+  return filename;
+}
 
 @ApiTags('Collaborator contracts')
 @ApiBearerAuth()
@@ -52,6 +95,33 @@ export class CollaboratorContractsController {
   constructor(
     private readonly collaboratorContractsService: CollaboratorContractsService,
   ) {}
+
+  /**
+   * Comercio del usuario autenticado.
+   *
+   * Passport cuelga el usuario de `req.user`. Leerlo como `req.merchant?.id` —tipando el
+   * request como AuthenticatedUser, lo que hacía pasar el error por delante del compilador—
+   * devolvía siempre undefined y el servicio respondía 403 a todas las llamadas.
+   */
+  private merchantIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number {
+    const merchantId = req.user?.merchant?.id;
+    if (!merchantId) {
+      throw new ForbiddenException(
+        'User must be associated with a merchant for this operation',
+      );
+    }
+    return merchantId;
+  }
+
+  /** Autor de la enmienda. Nunca bloquea: la bitácora acepta un autor desconocido. */
+  private userIdOf(
+    req: ExpressRequest & { user?: AuthenticatedUser },
+  ): number | null {
+    return req.user?.id ?? null;
+  }
+
 
   @Post()
   @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
@@ -107,9 +177,9 @@ export class CollaboratorContractsController {
   })
   async create(
     @Body() dto: CreateCollaboratorContractDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorContractResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorContractsService.create(dto, merchantId);
   }
 
@@ -137,9 +207,9 @@ export class CollaboratorContractsController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async findAll(
     @Query() query: GetCollaboratorContractQueryDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedCollaboratorContractsResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorContractsService.findAll(query, merchantId);
   }
 
@@ -163,9 +233,9 @@ export class CollaboratorContractsController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorContractResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorContractsService.findOne(id, merchantId);
   }
 
@@ -191,10 +261,142 @@ export class CollaboratorContractsController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCollaboratorContractDto,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorContractResponseDto> {
-    const merchantId = req.merchant?.id;
-    return this.collaboratorContractsService.update(id, dto, merchantId);
+    const merchantId = this.merchantIdOf(req);
+    return this.collaboratorContractsService.update(
+      id,
+      dto,
+      merchantId,
+      this.userIdOf(req),
+    );
+  }
+
+  /**
+   * Alias de PUT para las enmiendas parciales.
+   *
+   * El DTO ya es enteramente opcional, así que ambos verbos hacen lo mismo; se expone PATCH
+   * porque es lo que espera el cliente al enviar sólo los términos que cambian.
+   */
+  @Patch(':id')
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Scopes(
+    Scope.ADMIN_PORTAL,
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @ApiOperation({ summary: 'Amend collaborator contract (partial update)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiOkResponse({
+    description: 'Contract amended',
+    type: OneCollaboratorContractResponseDto,
+  })
+  async amend(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCollaboratorContractDto,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ): Promise<OneCollaboratorContractResponseDto> {
+    const merchantId = this.merchantIdOf(req);
+    return this.collaboratorContractsService.update(
+      id,
+      dto,
+      merchantId,
+      this.userIdOf(req),
+    );
+  }
+
+  @Post(':id/document')
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Scopes(
+    Scope.ADMIN_PORTAL,
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @UseInterceptors(
+    FileInterceptor('document', {
+      limits: { fileSize: MAX_CONTRACT_DOCUMENT_BYTES },
+      fileFilter: (_req, file, cb) => {
+        const ext = extname(file.originalname).toLowerCase();
+        const allowed =
+          ALLOWED_CONTRACT_DOCUMENT_MIME_TYPES.includes(file.mimetype) ||
+          ALLOWED_CONTRACT_DOCUMENT_EXTENSIONS.includes(ext);
+        cb(
+          allowed
+            ? null
+            : new BadRequestException(
+                'Only PDF or Word documents are accepted as signed contracts',
+              ),
+          allowed,
+        );
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload the signed contract document (PDF/DOCX)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { document: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiOkResponse({
+    description: 'Document attached',
+    type: OneCollaboratorContractResponseDto,
+  })
+  @ApiBadRequestResponse({ description: 'Missing or unsupported file' })
+  async uploadDocument(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: UploadedContractDocument | undefined,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ): Promise<OneCollaboratorContractResponseDto> {
+    const merchantId = this.merchantIdOf(req);
+    if (!file) {
+      throw new BadRequestException('A contract document file is required');
+    }
+    if (file.size > MAX_CONTRACT_DOCUMENT_BYTES) {
+      throw new PayloadTooLargeException(
+        'The signed contract must be 10MB or smaller',
+      );
+    }
+    const filename = storeContractDocument(file);
+    return this.collaboratorContractsService.attachDocument(
+      id,
+      {
+        url: `/${CONTRACT_DOCUMENT_DIR}/${filename}`,
+        name: file.originalname,
+      },
+      merchantId,
+      this.userIdOf(req),
+    );
+  }
+
+  @Get(':id/revisions')
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Scopes(
+    Scope.ADMIN_PORTAL,
+    Scope.MERCHANT_WEB,
+    Scope.MERCHANT_ANDROID,
+    Scope.MERCHANT_IOS,
+    Scope.MERCHANT_CLOVER,
+  )
+  @ApiOperation({ summary: 'Amendment history of a contract' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiOkResponse({
+    description: 'Amendment log, newest first',
+    type: ContractRevisionsResponseDto,
+  })
+  @ApiNotFoundResponse({ description: 'Contract not found' })
+  async revisions(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
+  ): Promise<ContractRevisionsResponseDto> {
+    const merchantId = this.merchantIdOf(req);
+    return this.collaboratorContractsService.revisions(id, merchantId);
   }
 
   @Delete(':id')
@@ -217,9 +419,9 @@ export class CollaboratorContractsController {
   @ApiForbiddenResponse({ description: 'Forbidden' })
   async remove(
     @Param('id', ParseIntPipe) id: number,
-    @Request() req: AuthenticatedUser,
+    @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneCollaboratorContractResponseDto> {
-    const merchantId = req.merchant?.id;
+    const merchantId = this.merchantIdOf(req);
     return this.collaboratorContractsService.remove(id, merchantId);
   }
 }

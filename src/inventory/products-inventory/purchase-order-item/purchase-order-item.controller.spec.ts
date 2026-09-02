@@ -73,6 +73,7 @@ describe('PurchaseOrderItemController', () => {
   describe('Create', () => {
     it('should create a purchase order item', async () => {
       const createDto: CreatePurchaseOrderItemDto = {
+        locationId: 1, // fixture al día con el tipo
         purchaseOrderId: 1,
         productId: 1,
         quantity: 5,
@@ -96,6 +97,7 @@ describe('PurchaseOrderItemController', () => {
 
     it('should handle errors during creation', async () => {
       const createDto: CreatePurchaseOrderItemDto = {
+        locationId: 1, // fixture al día con el tipo
         purchaseOrderId: 999,
         productId: 1,
         quantity: 5,
@@ -286,6 +288,7 @@ describe('PurchaseOrderItemController', () => {
 
     it('should call service methods with correct parameters', async () => {
       const createDto: CreatePurchaseOrderItemDto = {
+        locationId: 1, // fixture al día con el tipo
         purchaseOrderId: 1,
         productId: 1,
         quantity: 5,
