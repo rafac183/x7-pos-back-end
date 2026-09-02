@@ -27,7 +27,7 @@ export class StockAvailabilityService {
     const qty = item.currentQty;
     const min = item.minimumQty;
     const isOutOfStock = qty <= 0;
-    const isLowStock = !isOutOfStock && min != null && qty > 0 && qty <= min;
+    const isLowStock = !isOutOfStock && min != null && qty > 0 && qty < min;
     return { isOutOfStock, isLowStock };
   }
 

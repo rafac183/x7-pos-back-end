@@ -21,7 +21,7 @@ function computeStockLevelState(
   if (currentQty <= 0) {
     return InventoryStockAlertType.OUT_OF_STOCK;
   }
-  if (minimumQty != null && currentQty <= minimumQty) {
+  if (minimumQty != null && currentQty < minimumQty) {
     return InventoryStockAlertType.LOW;
   }
   return 'OK';

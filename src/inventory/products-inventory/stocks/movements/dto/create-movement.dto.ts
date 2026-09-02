@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsInt,
@@ -51,4 +51,33 @@ export class CreateMovementDto {
   @IsOptional()
   @IsString()
   reason?: string;
+
+  @ApiPropertyOptional({ example: 1, description: 'Source location ID' })
+  @IsOptional()
+  @IsInt()
+  sourceLocationId?: number;
+
+  @ApiPropertyOptional({ example: 2, description: 'Destination location ID' })
+  @IsOptional()
+  @IsInt()
+  destinationLocationId?: number;
+
+  @ApiPropertyOptional({ example: 'Admin', description: 'User who created the movement' })
+  @IsOptional()
+  @IsString()
+  createdBy?: string;
+
+  @ApiPropertyOptional({ example: 'TRANSFER', description: 'Raw material stock movement type' })
+  @IsOptional()
+  @IsString()
+  movementType?: string;
+
+  @ApiPropertyOptional({ example: 12.50, description: 'Unit cost of material' })
+  @IsOptional()
+  unitCost?: number | string;
+
+  @ApiPropertyOptional({ example: 5, description: 'Raw material supply ID' })
+  @IsOptional()
+  @IsInt()
+  supplyId?: number;
 }

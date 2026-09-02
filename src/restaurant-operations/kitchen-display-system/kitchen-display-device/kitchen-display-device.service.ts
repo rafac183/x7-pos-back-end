@@ -70,11 +70,14 @@ export class KitchenDisplayDeviceService {
       );
     }
 
-    if (
-      createKitchenDisplayDeviceDto.ipAddress &&
-      createKitchenDisplayDeviceDto.ipAddress.length > 50
-    ) {
-      throw new BadRequestException('IP address cannot exceed 50 characters');
+    if (createKitchenDisplayDeviceDto.ipAddress) {
+      if (createKitchenDisplayDeviceDto.ipAddress.length > 50) {
+        throw new BadRequestException('IP address cannot exceed 50 characters');
+      }
+      const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+      if (!ipv4Regex.test(createKitchenDisplayDeviceDto.ipAddress.trim())) {
+        throw new BadRequestException('Please enter a valid IPv4 address (e.g. 192.168.1.100)');
+      }
     }
 
     if (createKitchenDisplayDeviceDto.stationId) {
@@ -103,7 +106,7 @@ export class KitchenDisplayDeviceService {
 
     if (existingDevice) {
       throw new BadRequestException(
-        'A device with this identifier already exists for your merchant',
+        `A device with identifier '${createKitchenDisplayDeviceDto.deviceIdentifier}' is already paired in this store.`,
       );
     }
 
@@ -182,10 +185,24 @@ export class KitchenDisplayDeviceService {
       .leftJoinAndSelect('kitchenDisplayDevice.station', 'station')
       .where('kitchenDisplayDevice.merchant_id = :merchantId', {
         merchantId: authenticatedUserMerchantId,
-      })
-      .andWhere('kitchenDisplayDevice.status != :deletedStatus', {
+      });
+
+    if (query.status === 'deleted') {
+      queryBuilder.andWhere('kitchenDisplayDevice.status = :status', {
+        status: KitchenDisplayDeviceStatus.DELETED,
+      });
+    } else if (query.status === 'active') {
+      queryBuilder.andWhere('kitchenDisplayDevice.status = :status', {
+        status: KitchenDisplayDeviceStatus.ACTIVE,
+      });
+    } else if (query.status === 'all') {
+      // Sin filtro de status: incluir registros activos y borrados
+    } else {
+      // Por defecto si no se pasa parametro status
+      queryBuilder.andWhere('kitchenDisplayDevice.status != :deletedStatus', {
         deletedStatus: KitchenDisplayDeviceStatus.DELETED,
       });
+    }
 
     if (query.stationId) {
       queryBuilder.andWhere('kitchenDisplayDevice.station_id = :stationId', {
@@ -382,7 +399,7 @@ export class KitchenDisplayDeviceService {
 
       if (existingDevice && existingDevice.id !== id) {
         throw new BadRequestException(
-          'A device with this identifier already exists for your merchant',
+          `A device with identifier '${updateKitchenDisplayDeviceDto.deviceIdentifier}' is already paired in this store.`,
         );
       }
       existingKitchenDisplayDevice.device_identifier =
@@ -410,14 +427,25 @@ export class KitchenDisplayDeviceService {
     }
 
     if (updateKitchenDisplayDeviceDto.ipAddress !== undefined) {
-      if (
-        updateKitchenDisplayDeviceDto.ipAddress &&
-        updateKitchenDisplayDeviceDto.ipAddress.length > 50
-      ) {
-        throw new BadRequestException('IP address cannot exceed 50 characters');
+      if (updateKitchenDisplayDeviceDto.ipAddress) {
+        if (updateKitchenDisplayDeviceDto.ipAddress.length > 50) {
+          throw new BadRequestException('IP address cannot exceed 50 characters');
+        }
+        const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (!ipv4Regex.test(updateKitchenDisplayDeviceDto.ipAddress.trim())) {
+          throw new BadRequestException('Please enter a valid IPv4 address (e.g. 192.168.1.100)');
+        }
       }
       existingKitchenDisplayDevice.ip_address =
-        updateKitchenDisplayDeviceDto.ipAddress || null;
+        updateKitchenDisplayDeviceDto.ipAddress ? updateKitchenDisplayDeviceDto.ipAddress.trim() : null;
+    }
+
+    if (updateKitchenDisplayDeviceDto.status !== undefined) {
+      existingKitchenDisplayDevice.status = updateKitchenDisplayDeviceDto.status;
+      if (updateKitchenDisplayDeviceDto.status === KitchenDisplayDeviceStatus.DELETED) {
+        existingKitchenDisplayDevice.is_online = false;
+        existingKitchenDisplayDevice.station_id = null;
+      }
     }
 
     if (updateKitchenDisplayDeviceDto.isOnline !== undefined) {

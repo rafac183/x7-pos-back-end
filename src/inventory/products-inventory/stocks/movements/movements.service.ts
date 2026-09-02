@@ -44,18 +44,16 @@ export class MovementsService {
       destinationLocationId?: number | null;
       createdBy?: string | null;
       movementType?: string | null;
+      unitCost?: number | string | null;
+      supplyId?: number | null;
     },
   ): Promise<OneMovementResponse> {
-    const { stockItemId, quantity, type, reference, reason, sourceLocationId, destinationLocationId, createdBy, movementType } =
+    const { stockItemId, quantity, type, reference, reason, sourceLocationId, destinationLocationId, createdBy, movementType, unitCost, supplyId } =
       createMovementDto;
     const merchantId = merchant_id;
 
-    if (!stockItemId || stockItemId <= 0) {
-      ErrorHandler.invalidId(ErrorMessage.ITEM_ID_INCORRECT);
-    }
-
     if (quantity <= 0) {
-      ErrorHandler.invalidId(ErrorMessage.MOVEMENT_QUANTITY_INVALID);
+      throw new BadRequestException('Movement quantity must be greater than 0.');
     }
 
     const merchant = await this.itemRepository.manager.findOne(Merchant, {
@@ -63,32 +61,82 @@ export class MovementsService {
       select: ['companyId'],
     });
 
-    const item = await this.itemRepository
-      .createQueryBuilder('item')
-      .leftJoinAndSelect('item.product', 'product')
-      .leftJoinAndSelect('item.supply', 'supply')
-      .where('item.id = :stockItemId', { stockItemId })
-      .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
-        merchantId,
-        companyId: merchant?.companyId,
-      })
-      .andWhere('item.isActive = :isActive', { isActive: true })
-      .getOne();
+    let item: Item | null = null;
 
-    if (!item) {
-      ErrorHandler.notFound(ErrorMessage.ITEM_NOT_FOUND);
+    if (stockItemId && stockItemId > 0) {
+      item = await this.itemRepository
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.product', 'product')
+        .leftJoinAndSelect('item.supply', 'supply')
+        .leftJoinAndSelect('item.location', 'location')
+        .where('item.id = :stockItemId', { stockItemId })
+        .andWhere('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
+          merchantId,
+          companyId: merchant?.companyId,
+        })
+        .andWhere('item.isActive = :isActive', { isActive: true })
+        .getOne();
+    } else if (supplyId && (sourceLocationId || destinationLocationId)) {
+      const targetLocId = sourceLocationId || destinationLocationId;
+      item = await this.itemRepository.findOne({
+        where: {
+          supplyId,
+          locationId: targetLocId,
+          isActive: true,
+        },
+        relations: ['supply', 'location'],
+      });
+
+      if (!item && targetLocId) {
+        item = this.itemRepository.create({
+          supplyId,
+          locationId: targetLocId,
+          currentQty: 0,
+          minimumQty: 5,
+          isActive: true,
+          weightedAverageUnitCost: unitCost ? String(unitCost) : '0.0000',
+        });
+        item = await this.itemRepository.save(item);
+        item = await this.itemRepository.findOne({
+          where: { id: item.id },
+          relations: ['supply', 'location'],
+        });
+      }
     }
 
-    // Actualizar las existencias en stock_item según la naturaleza del movimiento
-    const isEntry = type === MovementsStatus.IN || ['PURCHASE_RECEIPT', 'RETURN', 'IN'].includes(movementType || '');
-    const isTransfer = movementType === 'TRANSFER' && destinationLocationId && destinationLocationId !== item.locationId;
+    if (!item) {
+      throw new NotFoundException('Stock item record not found for the selected raw material and location.');
+    }
+
+    // 1. Guard de validación para Transferencias
+    if (movementType === 'TRANSFER') {
+      if (sourceLocationId && destinationLocationId && Number(sourceLocationId) === Number(destinationLocationId)) {
+        throw new BadRequestException('Source and destination locations must be different.');
+      }
+    }
+
+    // 2. Insufficient Stock Guard para TRANSFER, WASTE, POS_DEPLETION o salidas
+    const isDecrement = movementType === 'TRANSFER' || movementType === 'WASTE' || movementType === 'POS_DEPLETION' || type === MovementsStatus.OUT;
+    if (isDecrement) {
+      const sourceLocationName = item.location?.name || 'Source Location';
+      const availableStock = Number(item.currentQty || 0);
+      if (availableStock < quantity) {
+        throw new BadRequestException(
+          `Insufficient stock in [${sourceLocationName}]. Available: ${availableStock}, Requested: ${quantity}.`
+        );
+      }
+    }
+
+    // 3. Mutación de existencias según tipo de movimiento
+    const isEntry = type === MovementsStatus.IN || (type as any) === 'IN' || ['PURCHASE_RECEIPT', 'RETURN'].includes(movementType || '');
+    const isTransfer = movementType === 'TRANSFER' && destinationLocationId && Number(destinationLocationId) !== item.locationId;
 
     if (isTransfer) {
-      // 1. Restar stock del almacén de origen
+      // Restar stock de almacén de origen
       item.currentQty = Math.max(0, Number(item.currentQty || 0) - Number(quantity));
       await this.itemRepository.save(item);
 
-      // 2. Buscar o inicializar el stock_item en la ubicación de destino
+      // Incrementar stock en almacén de destino
       let destItem = await this.itemRepository.findOne({
         where: {
           supplyId: item.supplyId || undefined,
@@ -116,17 +164,20 @@ export class MovementsService {
       await this.itemRepository.save(destItem);
     } else if (isEntry) {
       item.currentQty = Number(item.currentQty || 0) + Number(quantity);
+      if (unitCost) {
+        item.weightedAverageUnitCost = String(unitCost);
+      }
       await this.itemRepository.save(item);
     } else {
-      // Salida, mermas (WASTE), consumo o ajuste negativo
       item.currentQty = Math.max(0, Number(item.currentQty || 0) - Number(quantity));
       await this.itemRepository.save(item);
     }
 
     const newMovement = this.movementRepository.create({
+      stockItemId: item.id,
       item,
       quantity,
-      type,
+      type: isEntry ? MovementsStatus.IN : MovementsStatus.OUT,
       reference,
       reason,
       merchantId: merchant_id,
@@ -134,7 +185,8 @@ export class MovementsService {
       sourceLocationId: sourceLocationId ?? item.locationId ?? null,
       destinationLocationId: destinationLocationId ?? null,
       createdBy: createdBy ?? null,
-      movementType: movementType ?? null,
+      movementType: movementType ?? (isEntry ? 'PURCHASE_RECEIPT' : 'ADJUSTMENT'),
+      unitCost: unitCost ? String(unitCost) : item.weightedAverageUnitCost,
     });
 
     const savedMovement = await this.movementRepository.save(newMovement);
@@ -147,7 +199,6 @@ export class MovementsService {
     }
 
     return this.findOne(savedMovement.id, merchantId, 'Created');
-
   }
 
   async findAll(
@@ -170,6 +221,9 @@ export class MovementsService {
       .leftJoinAndSelect('movement.item', 'item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.supply', 'supply')
+      .leftJoinAndSelect('item.location', 'itemLocation')
+      .leftJoinAndSelect('movement.sourceLocation', 'sourceLocation')
+      .leftJoinAndSelect('movement.destinationLocation', 'destinationLocation')
       .leftJoinAndSelect('movement.merchant', 'merchant')
       .where('(product.merchantId = :merchantId OR supply.company_id = :companyId)', {
         merchantId,
@@ -240,14 +294,20 @@ export class MovementsService {
             ? ({
                 id: movement.item.id,
                 currentQty: movement.item.currentQty,
-              } as ItemLittleResponseDto)
+                product: movement.item.product ? { name: movement.item.product.name } : null,
+                supply: movement.item.supply ? { name: movement.item.supply.name } : null,
+                location: movement.item.location ? { id: movement.item.location.id, name: movement.item.location.name } : null,
+              } as any)
             : null,
           quantity: movement.quantity,
           type: movement.type,
           reference: movement.reference,
           reason: movement.reason,
           sourceLocationId: movement.sourceLocationId,
+          sourceLocationName: movement.sourceLocation?.name || movement.item?.location?.name || null,
           destinationLocationId: movement.destinationLocationId,
+          destinationLocationName: movement.destinationLocation?.name || null,
+          unitCost: movement.unitCost ? String(movement.unitCost) : (movement.item?.weightedAverageUnitCost || null),
           createdBy: movement.createdBy,
           movementType: movement.movementType,
           merchant: movement.merchant
@@ -311,6 +371,9 @@ export class MovementsService {
       .leftJoinAndSelect('movement.item', 'item')
       .leftJoinAndSelect('item.product', 'product')
       .leftJoinAndSelect('item.supply', 'supply')
+      .leftJoinAndSelect('item.location', 'itemLocation')
+      .leftJoinAndSelect('movement.sourceLocation', 'sourceLocation')
+      .leftJoinAndSelect('movement.destinationLocation', 'destinationLocation')
       .leftJoinAndSelect('movement.merchant', 'merchant')
       .where('movement.id = :id', { id })
       .andWhere('movement.isActive = :isActive', {
@@ -327,7 +390,7 @@ export class MovementsService {
     const movement = await movementQueryBuilder.getOne();
 
     if (!movement) {
-      ErrorHandler.notFound(ErrorMessage.MOVEMENT_NOT_FOUND); // Need to add MOVEMENT_NOT_FOUND to error-messages.ts
+      ErrorHandler.notFound(ErrorMessage.MOVEMENT_NOT_FOUND);
     }
 
     const result: MovementResponseDto = {
@@ -336,14 +399,20 @@ export class MovementsService {
         ? ({
             id: movement.item.id,
             currentQty: movement.item.currentQty,
-          } as ItemLittleResponseDto)
+            product: movement.item.product ? { name: movement.item.product.name } : null,
+            supply: movement.item.supply ? { name: movement.item.supply.name } : null,
+            location: movement.item.location ? { id: movement.item.location.id, name: movement.item.location.name } : null,
+          } as any)
         : null,
       quantity: movement.quantity,
       type: movement.type,
       reference: movement.reference,
       reason: movement.reason,
       sourceLocationId: movement.sourceLocationId,
+      sourceLocationName: movement.sourceLocation?.name || movement.item?.location?.name || null,
       destinationLocationId: movement.destinationLocationId,
+      destinationLocationName: movement.destinationLocation?.name || null,
+      unitCost: movement.unitCost ? String(movement.unitCost) : (movement.item?.weightedAverageUnitCost || null),
       createdBy: movement.createdBy,
       movementType: movement.movementType,
       merchant: movement.merchant

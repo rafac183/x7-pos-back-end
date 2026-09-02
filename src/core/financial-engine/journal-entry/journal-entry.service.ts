@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JournalEntry } from './entities/journal-entry.entity';
@@ -23,7 +23,7 @@ import { JournalEntryReferenceType } from './constants/journal-entry-reference-t
 import { SuccessResponse } from 'src/common/dtos/success-response.dto';
 
 @Injectable()
-export class JournalEntryService {
+export class JournalEntryService implements OnModuleInit {
   constructor(
     @InjectRepository(JournalEntry)
     private readonly journalEntryRepository: Repository<JournalEntry>,
@@ -36,6 +36,155 @@ export class JournalEntryService {
     @InjectRepository(Merchant)
     private readonly merchantRepository: Repository<Merchant>,
   ) {}
+
+  async onModuleInit() {
+    await this.seedDatabaseIfEmpty();
+  }
+
+  async seedDatabaseIfEmpty() {
+    try {
+      const count = await this.journalEntryRepository.count();
+      if (count === 0) {
+        const entry1 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-001',
+          entry_date: new Date('2026-08-19'),
+          description: 'Stock Receipt: 50 KG Flour 25kg bag via Purchase Order #PO-2026-089',
+          status: JournalEntryStatus.POSTED,
+          total_debit: 1250.0,
+          total_credit: 1250.0,
+          reference_type: JournalEntryReferenceType.INVENTORY,
+          reference_id: 89,
+        } as any);
+        const savedEntry1 = (await this.journalEntryRepository.save(entry1 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry1.id, account_id: 2, debit: 1250.0, credit: 0.0, description: 'Stock receipt: 50.0 KG Flour 25kg bag via PO #PO-2026-089' },
+          { journal_entry_id: savedEntry1.id, account_id: 6, debit: 0.0, credit: 1250.0, description: 'Supplier Accounts Payable liability for Purchase Order #PO-2026-089' },
+        ]);
+
+        const entry2 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-002',
+          entry_date: new Date('2026-08-18'),
+          description: 'POS Sales Depletion & Cost Allocation Order #1088',
+          status: JournalEntryStatus.POSTED,
+          total_debit: 345.5,
+          total_credit: 345.5,
+          reference_type: JournalEntryReferenceType.ORDER,
+          reference_id: 1088,
+        } as any);
+        const savedEntry2 = (await this.journalEntryRepository.save(entry2 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry2.id, account_id: 13, debit: 345.5, credit: 0.0, description: 'Stock depletion: 15.5 KG Flour 25kg bag via POS Sales Order #1088' },
+          { journal_entry_id: savedEntry2.id, account_id: 2, debit: 0.0, credit: 345.5, description: 'Raw material inventory reduction via POS Sales Order #1088' },
+        ]);
+
+        const entry3 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-003',
+          entry_date: new Date('2026-08-17'),
+          description: 'Stock Waste Write-off: Expired Whole Milk Batch #042',
+          status: JournalEntryStatus.POSTED,
+          total_debit: 88.0,
+          total_credit: 88.0,
+          reference_type: JournalEntryReferenceType.INVENTORY,
+          reference_id: 42,
+        } as any);
+        const savedEntry3 = (await this.journalEntryRepository.save(entry3 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry3.id, account_id: 14, debit: 88.0, credit: 0.0, description: 'Inventory waste breakdown: 2.0 L Whole Milk (Expired batch)' },
+          { journal_entry_id: savedEntry3.id, account_id: 2, debit: 0.0, credit: 88.0, description: 'Raw material inventory write-off for expired batch #042' },
+        ]);
+
+        const entry4 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-004',
+          entry_date: new Date('2026-08-16'),
+          description: 'Physical Inventory Audit Adjustment - Main Storage Hub',
+          status: JournalEntryStatus.DRAFT,
+          total_debit: 150.0,
+          total_credit: 150.0,
+          reference_type: JournalEntryReferenceType.ADJUSTMENT,
+          reference_id: 15,
+        } as any);
+        const savedEntry4 = (await this.journalEntryRepository.save(entry4 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry4.id, account_id: 2, debit: 150.0, credit: 0.0, description: 'Physical count adjustment: System count 10 -> Actual count 15 (+5 units)' },
+          { journal_entry_id: savedEntry4.id, account_id: 15, debit: 0.0, credit: 150.0, description: 'Physical count variance adjustment gain credit' },
+        ]);
+
+        const entry5 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-005',
+          entry_date: new Date('2026-08-15'),
+          description: 'Raw Material Supplier Stock Receipt: 30.0 L Extra Virgin Olive Oil via PO #PO-2026-095',
+          status: JournalEntryStatus.POSTED,
+          total_debit: 450.0,
+          total_credit: 450.0,
+          reference_type: JournalEntryReferenceType.INVENTORY,
+          reference_id: 95,
+        } as any);
+        const savedEntry5 = (await this.journalEntryRepository.save(entry5 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry5.id, account_id: 2, debit: 450.0, credit: 0.0, description: 'Stock receipt: 30.0 L Extra Virgin Olive Oil via Purchase Order #PO-2026-095' },
+          { journal_entry_id: savedEntry5.id, account_id: 6, debit: 0.0, credit: 450.0, description: 'Supplier Accounts Payable liability for Purchase Order #PO-2026-095' },
+        ]);
+
+        const entry6 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-006',
+          entry_date: new Date('2026-08-14'),
+          description: 'Supplier Duplicate Stock Receipt Reversal & Order Cancellation',
+          status: JournalEntryStatus.VOIDED,
+          total_debit: 620.0,
+          total_credit: 620.0,
+          reference_type: JournalEntryReferenceType.INVENTORY,
+          reference_id: 99,
+        } as any);
+        const savedEntry6 = (await this.journalEntryRepository.save(entry6 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry6.id, account_id: 2, debit: 620.0, credit: 0.0, description: 'Duplicate raw material inventory posting reversal' },
+          { journal_entry_id: savedEntry6.id, account_id: 6, debit: 0.0, credit: 620.0, description: 'Cancelled supplier accounts payable entry' },
+        ]);
+
+        const entry7 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-007',
+          entry_date: new Date('2026-08-13'),
+          description: 'Inventory Physical Count Reconciliation - Walk-in Freezer Hub',
+          status: JournalEntryStatus.DRAFT,
+          total_debit: 980.0,
+          total_credit: 980.0,
+          reference_type: JournalEntryReferenceType.ADJUSTMENT,
+          reference_id: 22,
+        } as any);
+        const savedEntry7 = (await this.journalEntryRepository.save(entry7 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry7.id, account_id: 2, debit: 980.0, credit: 0.0, description: 'Freezer Hub physical count reconciliation: +25 units frozen beef patties' },
+          { journal_entry_id: savedEntry7.id, account_id: 15, debit: 0.0, credit: 980.0, description: 'Inventory physical count gain adjustment credit' },
+        ]);
+
+        const entry8 = this.journalEntryRepository.create({
+          company_id: 1,
+          entry_number: 'JE-2026-008',
+          entry_date: new Date('2026-08-12'),
+          description: 'Voided Damaged Stock Return to Supplier Entry',
+          status: JournalEntryStatus.VOIDED,
+          total_debit: 210.0,
+          total_credit: 210.0,
+          reference_type: JournalEntryReferenceType.INVENTORY,
+          reference_id: 104,
+        } as any);
+        const savedEntry8 = (await this.journalEntryRepository.save(entry8 as any)) as unknown as JournalEntry;
+        await this.journalEntryLineRepository.save([
+          { journal_entry_id: savedEntry8.id, account_id: 6, debit: 210.0, credit: 0.0, description: 'Voided damaged stock return debit' },
+          { journal_entry_id: savedEntry8.id, account_id: 15, debit: 0.0, credit: 210.0, description: 'Voided damaged stock return variance credit' },
+        ]);
+      }
+    } catch (err: any) {
+      console.log('JournalEntry DB seed check deferred:', err.message);
+    }
+  }
 
   // ─── Helpers privados ──────────────────────────────────────────────────────
 

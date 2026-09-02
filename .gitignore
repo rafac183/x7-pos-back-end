@@ -68,3 +68,14 @@ docker-compose.yml
 *.png
 *.md
 /.agent
+/.superpowers
+*.diff
+
+# Temporary dev scripts & diagnostics
+check_*.js
+check_*.sql
+clean_*.js
+query-db-state.js
+normalize_orders.js
+seed_*.js
+test-items-service-ts*

@@ -1,5 +1,5 @@
 //src/core/configuration/merchant-tax-rule/merchant-tax-rule.service.ts
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Company } from 'src/platform-saas/companies/entities/company.entity';
 import { User } from 'src/platform-saas/users/entities/user.entity';
@@ -35,7 +35,7 @@ const TAX_RULE_SELECT_FIELDS = [
 ];
 
 @Injectable()
-export class MerchantTaxRuleService {
+export class MerchantTaxRuleService implements OnModuleInit {
   constructor(
     @InjectRepository(MerchantTaxRule)
     private readonly merchantTaxRuleRepository: Repository<MerchantTaxRule>,
@@ -49,6 +49,88 @@ export class MerchantTaxRuleService {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
+
+  async onModuleInit() {
+    await this.seedDatabaseIfEmpty();
+  }
+
+  async seedDatabaseIfEmpty() {
+    try {
+      const count = await this.merchantTaxRuleRepository.count();
+      if (count === 0) {
+        const seedRules = [
+          {
+            merchant_id: 1,
+            name: 'IVA General Standard Sales Tax (19%)',
+            description: 'Standard 19% national value added sales tax applicable to POS items',
+            taxType: TaxType.PERCENTAGE,
+            rate: 0.19,
+            appliesToTips: false,
+            appliesToOvertime: false,
+            status: 'active',
+            externalTaxCode: 'TAX-IVA-19',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            merchant_id: 1,
+            name: 'Impuesto al Consumo ICO F&B (8%)',
+            description: 'National 8% food & beverage consumption tax rate for restaurant sales',
+            taxType: TaxType.PERCENTAGE,
+            rate: 0.08,
+            appliesToTips: false,
+            appliesToOvertime: false,
+            status: 'active',
+            externalTaxCode: 'TAX-ICO-08',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            merchant_id: 1,
+            name: 'Impuesto Municipal de Licores (5%)',
+            description: 'Compound 5% luxury liquor tax surcharge calculated on subtotal',
+            taxType: TaxType.COMPOUND,
+            rate: 0.05,
+            appliesToTips: false,
+            appliesToOvertime: false,
+            status: 'active',
+            externalTaxCode: 'TAX-LIC-05',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            merchant_id: 1,
+            name: 'Tasa Fija por Bolsa Plástica Ecológica ($0.25)',
+            description: 'Fixed $0.25 environmental bag surcharge fee per order transaction',
+            taxType: TaxType.FIXED,
+            rate: 0.25,
+            appliesToTips: false,
+            appliesToOvertime: false,
+            status: 'active',
+            externalTaxCode: 'TAX-BAG-025',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+          {
+            merchant_id: 1,
+            name: 'Retención de Impuesto sobre Propinas (10%)',
+            description: 'Special 10% tax retention rule applying directly to voluntary customer tips',
+            taxType: TaxType.PERCENTAGE,
+            rate: 0.10,
+            appliesToTips: true,
+            appliesToOvertime: false,
+            status: 'inactive',
+            externalTaxCode: 'TAX-TIP-10',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+        await this.merchantTaxRuleRepository.save(seedRules as any);
+      }
+    } catch (err: any) {
+      console.log('MerchantTaxRule DB seed check deferred:', err.message);
+    }
+  }
 
   private validateRate(taxType: TaxType, rate: number): void {
     if (rate === undefined || rate === null) {

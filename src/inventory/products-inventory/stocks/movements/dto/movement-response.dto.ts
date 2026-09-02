@@ -40,8 +40,17 @@ export class MovementResponseDto {
   @ApiPropertyOptional({ example: 1, description: 'Source location ID' })
   sourceLocationId: number | null;
 
+  @ApiPropertyOptional({ example: 'Main Warehouse', description: 'Source location name' })
+  sourceLocationName?: string | null;
+
   @ApiPropertyOptional({ example: 2, description: 'Destination location ID' })
   destinationLocationId: number | null;
+
+  @ApiPropertyOptional({ example: 'Kitchen Storage', description: 'Destination location name' })
+  destinationLocationName?: string | null;
+
+  @ApiPropertyOptional({ example: '12.50', description: 'Unit cost of material in movement' })
+  unitCost?: string | null;
 
   @ApiPropertyOptional({ example: 'Admin', description: 'User who created the movement' })
   createdBy: string | null;
