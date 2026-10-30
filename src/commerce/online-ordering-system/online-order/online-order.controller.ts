@@ -254,6 +254,7 @@ export class OnlineOrderController {
   ): Promise<OneOnlineOrderResponseDto> {
     const merchantId = req.user?.merchant?.id;
     const userId = req.user?.id;
+    let wasAcceptedJustNow = false;
     if (
       fulfillmentStatus &&
       fulfillmentStatus !== OnlineOrderFulfillmentStatus.RECEIVED &&
@@ -267,9 +268,13 @@ export class OnlineOrderController {
           userId,
           stationId ? Number(stationId) : undefined,
         );
+        wasAcceptedJustNow = true;
       }
     }
-    if (fulfillmentStatus === OnlineOrderFulfillmentStatus.ACCEPTED) {
+    if (
+      wasAcceptedJustNow &&
+      fulfillmentStatus === OnlineOrderFulfillmentStatus.ACCEPTED
+    ) {
       return this.onlineOrderService.findOne(id, merchantId);
     }
     return this.onlineOrderService.updateFulfillmentStatus(

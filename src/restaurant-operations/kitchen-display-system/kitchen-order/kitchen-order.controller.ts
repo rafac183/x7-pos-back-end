@@ -72,7 +72,7 @@ export class KitchenOrderController {
   constructor(private readonly kitchenOrderService: KitchenOrderService) {}
 
   @Post()
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -440,7 +440,7 @@ export class KitchenOrderController {
   }
 
   @Patch(':id/cancel')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,

@@ -133,7 +133,7 @@ export class KitchenStationController {
   }
 
   @Get()
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -238,7 +238,7 @@ export class KitchenStationController {
   }
 
   @Get('rerouting-status')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -267,7 +267,7 @@ export class KitchenStationController {
   }
 
   @Get(':id')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -503,7 +503,7 @@ export class KitchenStationController {
   }
 
   @Post(':id/heartbeat')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
