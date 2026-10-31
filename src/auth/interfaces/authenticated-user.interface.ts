@@ -23,4 +23,8 @@ export interface AuthenticatedUser {
   collaboratorId?: number;
   /** Merchant's active cash register shift ID (injected by ActiveShiftGuard). */
   activeShiftId?: number;
+  /** Physical terminal device ID if the session was created via device pairing or PIN login. */
+  deviceId?: number;
+  /** Bound kitchen station ID if device is a KDS terminal. */
+  stationId?: number | null;
 }
