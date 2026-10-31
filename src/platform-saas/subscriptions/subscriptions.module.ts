@@ -4,6 +4,8 @@ import { CompanySubscription } from './company-subscriptions/entities/company-su
 import { SubscriptionPayment } from './subscription-payments/entity/subscription-payments.entity';
 import { FeatureShiftRole } from './entities/feature-shift-role.entity';
 import { UserFeatureOverride } from './entities/user-feature-override.entity';
+import { NavCategory } from './entities/nav-category.entity';
+import { NavItem } from './entities/nav-item.entity';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionPlanModule } from './subscription-plan/subscription-plan.module';
@@ -21,7 +23,12 @@ import { SubscriptionPaymentsModule } from './subscription-payments/subscription
   providers: [SubscriptionsService],
   exports: [
     SubscriptionsService,
-    TypeOrmModule.forFeature([FeatureShiftRole, UserFeatureOverride]),
+    TypeOrmModule.forFeature([
+      FeatureShiftRole,
+      UserFeatureOverride,
+      NavCategory,
+      NavItem,
+    ]),
   ],
   imports: [
     TypeOrmModule.forFeature([
@@ -29,6 +36,8 @@ import { SubscriptionPaymentsModule } from './subscription-payments/subscription
       SubscriptionPayment,
       FeatureShiftRole,
       UserFeatureOverride,
+      NavCategory,
+      NavItem,
     ]),
     SubscriptionPlanModule,
     MerchantSubscriptionModule,
