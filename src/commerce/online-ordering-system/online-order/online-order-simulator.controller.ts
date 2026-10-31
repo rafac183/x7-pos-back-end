@@ -3,9 +3,6 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
-import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
-import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/platform-saas/users/constants/role.enum';
 import { Request as ExpressRequest } from 'express';
@@ -19,8 +16,7 @@ type AuthenticatedRequest = ExpressRequest & { user: AuthenticatedUser };
 @ApiTags('Online Orders (Dev Simulator)')
 @ApiBearerAuth()
 @Controller('online-orders')
-@RequireFeature(SUBSCRIPTION_FEATURE_IDS.ONLINE_ORDERS)
-@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class OnlineOrderSimulatorController {
   constructor(
     private readonly onlineOrderService: OnlineOrderService,

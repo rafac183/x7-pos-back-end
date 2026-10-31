@@ -37,7 +37,6 @@ import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
 import { UserRole } from 'src/platform-saas/users/constants/role.enum';
 import { Scope } from 'src/platform-saas/users/constants/scope.enum';
-import { ShiftRole } from 'src/restaurant-operations/shift/shifts/constants/shift-role.enum';
 import { DeliveryAssignmentService } from './delivery-assignment.service';
 import { CreateDeliveryAssignmentDto } from './dto/create-delivery-assignment.dto';
 import {
@@ -267,22 +266,7 @@ export class DeliveryAssignmentController {
     @Query() query: QueryDeliveryAssignmentDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaginatedDeliveryAssignmentResponseDto> {
-    const isManagerOrAdmin =
-      user?.role === UserRole.SUPER_ADMIN ||
-      user?.role === UserRole.MERCHANT_ADMIN ||
-      user?.shiftRole === ShiftRole.MANAGER;
-
-    const effectiveQuery = { ...query };
-    if (!isManagerOrAdmin && user?.email) {
-      if (!effectiveQuery.search) {
-        effectiveQuery.search = user.email.split('@')[0];
-      }
-    }
-
-    return this.deliveryAssignmentService.findAll(
-      effectiveQuery,
-      user.merchant?.id,
-    );
+    return this.deliveryAssignmentService.findAll(query, user.merchant?.id);
   }
 
   // Declarado antes de `:id` para que "summary" no se interprete como un id.

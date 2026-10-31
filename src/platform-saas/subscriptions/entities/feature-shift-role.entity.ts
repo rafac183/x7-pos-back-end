@@ -13,10 +13,12 @@ import { FeatureEntity } from '../features/entity/features.entity';
 import { ShiftRole } from '../../../restaurant-operations/shift/shifts/constants/shift-role.enum';
 
 @Entity('feature_shift_role')
-@Unique(['feature_id', 'shift_role'])
+@Unique('UQ_feature_shift_role', ['feature_id', 'shift_role'])
 export class FeatureShiftRole {
   @ApiProperty({ example: 1, description: 'Unique identifier' })
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({
+    primaryKeyConstraintName: 'PK_feature_shift_role_id',
+  })
   id: number;
 
   @ApiProperty({ example: 15, description: 'Feature ID' })
@@ -24,7 +26,10 @@ export class FeatureShiftRole {
   feature_id: number;
 
   @ManyToOne(() => FeatureEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'feature_id' })
+  @JoinColumn({
+    name: 'feature_id',
+    foreignKeyConstraintName: 'FK_feature_shift_role_feature',
+  })
   feature: FeatureEntity;
 
   @ApiProperty({
@@ -37,7 +42,7 @@ export class FeatureShiftRole {
     enum: ShiftRole,
     name: 'shift_role',
   })
-  @Index()
+  @Index('IDX_feature_shift_role_shift_role')
   shift_role: ShiftRole;
 
   @ApiProperty({ description: 'Creation timestamp' })

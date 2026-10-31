@@ -4,6 +4,40 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
   name = 'CreateShiftRoleAndOverrideTables1793600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // 0. Ensure feature 117 (Kitchen Performance) exists
+    await queryRunner.query(`
+      INSERT INTO "feature" ("id", "name", "description", "Unit", "status")
+      VALUES (117, 'Kitchen Performance', 'Kitchen Performance analytics and KPIs', 'Unit', 'active')
+      ON CONFLICT ("id") DO UPDATE SET
+        "name" = EXCLUDED."name",
+        "description" = EXCLUDED."description";
+    `);
+    await queryRunner.query(`
+      SELECT setval(pg_get_serial_sequence('feature', 'id'), (SELECT COALESCE(MAX(id), 1) FROM feature));
+    `);
+
+    // 0.1 Update plan_features alignments from approved matrix
+    // Remove 56, 57 from plan 1 (All KDS moves to Full Restaurant)
+    await queryRunner.query(`
+      DELETE FROM "plan_features" WHERE "subscription_plan_id" = 1 AND "feature_id" IN (56, 57);
+    `);
+    // Add 68 to plan 1 (Shift Assignment in Quick Service)
+    await queryRunner.query(`
+      INSERT INTO "plan_features" ("subscription_plan_id", "feature_id", "limit_value", "status")
+      VALUES (1, 68, 0, 'active')
+      ON CONFLICT DO NOTHING;
+    `);
+    // Remove 81 from plan 2 (Table Turnover Optimization in Enterprise only)
+    await queryRunner.query(`
+      DELETE FROM "plan_features" WHERE "subscription_plan_id" = 2 AND "feature_id" = 81;
+    `);
+    // Add 117 to plan 2 and 3
+    await queryRunner.query(`
+      INSERT INTO "plan_features" ("subscription_plan_id", "feature_id", "limit_value", "status")
+      VALUES (2, 117, 0, 'active'), (3, 117, 0, 'active')
+      ON CONFLICT DO NOTHING;
+    `);
+
     // 1. Table feature_shift_role
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "feature_shift_role" (
@@ -31,11 +65,12 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
         "id" SERIAL NOT NULL,
         "user_id" integer NOT NULL,
         "feature_id" bigint NOT NULL,
-        "effect" character varying(10) NOT NULL CHECK ("effect" IN ('allow', 'deny')),
+        "effect" character varying(10) NOT NULL,
         "granted_by" integer,
         "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
         CONSTRAINT "PK_user_feature_override_id" PRIMARY KEY ("id"),
+        CONSTRAINT "CHK_user_feature_override_effect" CHECK ("effect" IN ('allow', 'deny')),
         CONSTRAINT "FK_user_feature_override_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE,
         CONSTRAINT "FK_user_feature_override_feature" FOREIGN KEY ("feature_id") REFERENCES "feature"("id") ON DELETE CASCADE,
         CONSTRAINT "FK_user_feature_override_granted_by" FOREIGN KEY ("granted_by") REFERENCES "users"("id") ON DELETE SET NULL,
@@ -51,7 +86,7 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
       ALTER TABLE "user_feature_override" ENABLE ROW LEVEL SECURITY;
     `);
 
-    // 3. Seed Shift-Roles Matrix (174 records)
+    // 3. Seed Shift-Roles Matrix (175 records)
     await queryRunner.query(`
       INSERT INTO "feature_shift_role" ("feature_id", "shift_role")
       VALUES
@@ -114,6 +149,7 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
         (57, 'bartender'),
         (57, 'cook'),
         (58, 'manager'),
+        (117, 'manager'),
         (59, 'manager'),
         (59, 'cashier'),
         (60, 'manager'),

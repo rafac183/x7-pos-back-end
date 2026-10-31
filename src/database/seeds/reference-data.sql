@@ -180,7 +180,8 @@ INSERT INTO feature (id, name, description, "Unit", status) VALUES
   (113, 'Marketing Coupon Redemption', 'Marketing Coupon Redemption managed from Loyalty System application Marketing System', 'Unit', 'active'),
   (114, 'Marketing Message Log', 'Marketing Message Log managed from Loyalty System application Marketing System', 'Unit', 'active'),
   (115, 'Marketing Segment', 'Marketing Segment managed from Loyalty System application Marketing System', 'Unit', 'active'),
-  (116, 'Marketing Segment Rule', 'Marketing Segment Rule managed from Loyalty System application Marketing System', 'Unit', 'active')
+  (116, 'Marketing Segment Rule', 'Marketing Segment Rule managed from Loyalty System application Marketing System', 'Unit', 'active'),
+  (117, 'Kitchen Performance', 'Kitchen Performance analytics and KPIs', 'Unit', 'active')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
@@ -281,8 +282,6 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (1, 45, 0, 'active'),
   (1, 49, 0, 'active'),
   (1, 53, 0, 'active'),
-  (1, 56, 0, 'active'),
-  (1, 57, 0, 'active'),
   (1, 59, 0, 'active'),
   (1, 60, 0, 'active'),
   (1, 61, 0, 'active'),
@@ -291,6 +290,7 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (1, 64, 0, 'active'),
   (1, 66, 0, 'active'),
   (1, 67, 0, 'active'),
+  (1, 68, 0, 'active'),
   (1, 69, 0, 'active'),
   (1, 91, 0, 'active'),
   (1, 92, 0, 'active'),
@@ -374,7 +374,6 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (2, 78, 0, 'active'),
   (2, 79, 0, 'active'),
   (2, 80, 0, 'active'),
-  (2, 81, 0, 'active'),
   (2, 82, 0, 'active'),
   (2, 83, 0, 'active'),
   (2, 84, 0, 'active'),
@@ -394,6 +393,7 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (2, 98, 0, 'active'),
   (2, 99, 0, 'active'),
   (2, 100, 0, 'active'),
+  (2, 117, 0, 'active'),
   (3, 1, 0, 'active'),
   (3, 2, 0, 'active'),
   (3, 3, 0, 'active'),
@@ -508,7 +508,8 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (3, 113, 0, 'active'),
   (3, 114, 0, 'active'),
   (3, 115, 0, 'active'),
-  (3, 116, 0, 'active');
+  (3, 116, 0, 'active'),
+  (3, 117, 0, 'active');
 
 SELECT setval(pg_get_serial_sequence('subscription_plan', 'id'), (SELECT COALESCE(MAX(id), 1) FROM subscription_plan));
 SELECT setval(pg_get_serial_sequence('application', 'id'), (SELECT COALESCE(MAX(id), 1) FROM application));

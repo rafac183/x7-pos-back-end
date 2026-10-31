@@ -30,7 +30,7 @@ import { GetExecutiveAnalyticsQueryDto } from './dto/executive-analytics.dto';
 @ApiTags('Restaurant operations - Kitchen Display System - Kitchen Analytics')
 @ApiBearerAuth()
 @Controller('kitchen-analytics')
-@RequireFeature(SUBSCRIPTION_FEATURE_IDS.KITCHEN_ORDERS)
+@RequireFeature(SUBSCRIPTION_FEATURE_IDS.KITCHEN_PERFORMANCE)
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 export class KitchenAnalyticsController {
   constructor(private readonly service: KitchenAnalyticsService) {}

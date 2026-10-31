@@ -47,7 +47,6 @@ import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { ErrorResponse } from '../../../common/dtos/error-response.dto';
-import { ShiftRole } from '../shifts/constants/shift-role.enum';
 
 @ApiTags('Restaurant operations - Shifts - Shift Assignments')
 @ApiExtraModels(ErrorResponse)
@@ -448,19 +447,8 @@ export class ShiftAssignmentsController {
       );
     }
 
-    const user = req.user;
-    const isManagerOrAdmin =
-      user?.role === UserRole.SUPER_ADMIN ||
-      user?.role === UserRole.MERCHANT_ADMIN ||
-      user?.shiftRole === ShiftRole.MANAGER;
-
-    const effectiveQuery = { ...query };
-    if (!isManagerOrAdmin && user?.collaboratorId) {
-      effectiveQuery.collaboratorId = user.collaboratorId;
-    }
-
     return this.shiftAssignmentsService.findAll(
-      effectiveQuery,
+      query,
       authenticatedUserMerchantId,
     );
   }

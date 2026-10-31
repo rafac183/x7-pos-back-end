@@ -48,6 +48,7 @@ import { Scope } from 'src/platform-saas/users/constants/scope.enum';
 import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { ShiftRole } from 'src/restaurant-operations/shift/shifts/constants/shift-role.enum';
 
 @ApiExtraModels(
   ErrorResponse,
@@ -84,7 +85,7 @@ export class CollaboratorTimeEntriesController {
   }
 
   @Post()
-  @Roles(UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -183,11 +184,21 @@ export class CollaboratorTimeEntriesController {
     @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<OneTimeEntryResponseDto> {
     const merchantId = this.merchantIdOf(req);
+    const user = req.user;
+    const isManagerOrAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.MERCHANT_ADMIN ||
+      user?.shiftRole === ShiftRole.MANAGER;
+
+    if (!isManagerOrAdmin && user?.collaboratorId) {
+      dto.collaborator_id = user.collaboratorId;
+    }
+
     return this.collaboratorTimeEntriesService.create(dto, merchantId);
   }
 
   @Get()
-  @Roles(UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -311,7 +322,21 @@ export class CollaboratorTimeEntriesController {
     @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ): Promise<PaginatedTimeEntriesResponseDto> {
     const merchantId = this.merchantIdOf(req);
-    return this.collaboratorTimeEntriesService.findAll(query, merchantId);
+    const user = req.user;
+    const isManagerOrAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.MERCHANT_ADMIN ||
+      user?.shiftRole === ShiftRole.MANAGER;
+
+    const effectiveQuery = { ...query };
+    if (!isManagerOrAdmin && user?.collaboratorId) {
+      effectiveQuery.collaborator_id = user.collaboratorId;
+    }
+
+    return this.collaboratorTimeEntriesService.findAll(
+      effectiveQuery,
+      merchantId,
+    );
   }
 
   @Get(':id/revisions')

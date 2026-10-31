@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
   Index,
   Unique,
+  Check,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '../../users/entities/user.entity';
@@ -21,19 +22,25 @@ export type FeatureOverrideEffect =
   (typeof FeatureOverrideEffect)[keyof typeof FeatureOverrideEffect];
 
 @Entity('user_feature_override')
-@Unique(['user_id', 'feature_id'])
+@Unique('UQ_user_feature_override', ['user_id', 'feature_id'])
+@Check('CHK_user_feature_override_effect', `"effect" IN ('allow', 'deny')`)
 export class UserFeatureOverride {
   @ApiProperty({ example: 1, description: 'Unique identifier' })
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn({
+    primaryKeyConstraintName: 'PK_user_feature_override_id',
+  })
   id: number;
 
   @ApiProperty({ example: 42, description: 'User ID' })
   @Column({ name: 'user_id', type: 'integer' })
-  @Index()
+  @Index('IDX_user_feature_override_user_id')
   user_id: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @JoinColumn({
+    name: 'user_id',
+    foreignKeyConstraintName: 'FK_user_feature_override_user',
+  })
   user: User;
 
   @ApiProperty({ example: 15, description: 'Feature ID' })
@@ -41,7 +48,10 @@ export class UserFeatureOverride {
   feature_id: number;
 
   @ManyToOne(() => FeatureEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'feature_id' })
+  @JoinColumn({
+    name: 'feature_id',
+    foreignKeyConstraintName: 'FK_user_feature_override_feature',
+  })
   feature: FeatureEntity;
 
   @ApiProperty({
@@ -61,7 +71,10 @@ export class UserFeatureOverride {
   granted_by: number | null;
 
   @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'granted_by' })
+  @JoinColumn({
+    name: 'granted_by',
+    foreignKeyConstraintName: 'FK_user_feature_override_granted_by',
+  })
   grantedBy: User | null;
 
   @ApiProperty({ description: 'Creation timestamp' })

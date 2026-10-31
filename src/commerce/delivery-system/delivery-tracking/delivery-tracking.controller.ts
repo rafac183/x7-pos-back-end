@@ -34,6 +34,7 @@ import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
 import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
 import { UserRole } from 'src/platform-saas/users/constants/role.enum';
 import { Scope } from 'src/platform-saas/users/constants/scope.enum';
+import { ShiftRole } from 'src/restaurant-operations/shift/shifts/constants/shift-role.enum';
 import { DeliveryTrackingService } from './delivery-tracking.service';
 import { CreateDeliveryTrackingDto } from './dto/create-delivery-tracking.dto';
 import {
@@ -136,7 +137,7 @@ export class DeliveryTrackingController {
   }
 
   @Get()
-  @Roles(UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.MERCHANT_WEB,
     Scope.MERCHANT_ANDROID,
@@ -186,7 +187,16 @@ export class DeliveryTrackingController {
     @Query() query: QueryDeliveryTrackingDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaginatedDeliveryTrackingResponseDto> {
-    return this.deliveryTrackingService.findAll(query, user.merchant?.id);
+    const isDeliveryRole = user?.shiftRole === ShiftRole.DELIVERY;
+    const effectiveQuery = { ...query };
+    if (isDeliveryRole && user?.collaboratorId) {
+      effectiveQuery.delivery_driver_id = user.collaboratorId;
+    }
+
+    return this.deliveryTrackingService.findAll(
+      effectiveQuery,
+      user.merchant?.id,
+    );
   }
 
   // Declaradas ANTES de `:id`: al revés, `live`, `summary` y `route` entran por el comodín
