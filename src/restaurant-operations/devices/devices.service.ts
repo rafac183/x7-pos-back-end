@@ -9,7 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { MerchantDevice } from './entities/merchant-device.entity';
 import { DevicePairingCode } from './entities/device-pairing-code.entity';
 import { User } from '../../platform-saas/users/entities/user.entity';
@@ -67,7 +67,9 @@ export class DevicesService {
         where: { id: dto.stationId, merchant_id: merchantId },
       });
       if (!station) {
-        throw new NotFoundException(`Kitchen station ${dto.stationId} not found for this branch`);
+        throw new NotFoundException(
+          `Kitchen station ${dto.stationId} not found for this branch`,
+        );
       }
     }
 
@@ -105,7 +107,10 @@ export class DevicesService {
    * Exchanges an ephemeral pairing code for a long-lived terminal device token.
    */
   async pairDevice(dto: PairDeviceDto): Promise<PairDeviceResponseDto> {
-    const codeHash = crypto.createHash('sha256').update(dto.code.trim().toUpperCase()).digest('hex');
+    const codeHash = crypto
+      .createHash('sha256')
+      .update(dto.code.trim().toUpperCase())
+      .digest('hex');
 
     const pairingRecord = await this.pairingCodeRepository.findOne({
       where: { code_hash: codeHash },
@@ -121,12 +126,17 @@ export class DevicesService {
     }
 
     if (new Date() > pairingRecord.expires_at) {
-      throw new BadRequestException('Pairing code has expired. Please generate a new one.');
+      throw new BadRequestException(
+        'Pairing code has expired. Please generate a new one.',
+      );
     }
 
     // Generate unique device secret and device token
     const deviceSecret = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(deviceSecret).digest('hex');
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(deviceSecret)
+      .digest('hex');
 
     const merchantDevice = this.deviceRepository.create({
       merchant_id: pairingRecord.merchant_id,
@@ -182,7 +192,9 @@ export class DevicesService {
   ): Promise<EmployeePinSessionResponseDto> {
     const deviceId = dto.deviceId ?? authHeaderOrDeviceContext.deviceId;
     if (!deviceId) {
-      throw new BadRequestException('Device identifier is required to establish PIN session.');
+      throw new BadRequestException(
+        'Device identifier is required to establish PIN session.',
+      );
     }
 
     const device = await this.deviceRepository.findOne({
@@ -190,7 +202,9 @@ export class DevicesService {
     });
 
     if (!device || device.revoked_at) {
-      throw new UnauthorizedException('Device terminal is revoked or unregistered.');
+      throw new UnauthorizedException(
+        'Device terminal is revoked or unregistered.',
+      );
     }
 
     // Check rate limit and brute-force lockout
@@ -236,8 +250,13 @@ export class DevicesService {
           'Maximum failed PIN attempts exceeded. Device locked for 5 minutes.',
         );
       } else {
-        this.failedAttempts.set(lockKey, { count: currentCount, lockedUntil: 0 });
-        throw new UnauthorizedException(`Invalid employee PIN. Attempt ${currentCount} of 5.`);
+        this.failedAttempts.set(lockKey, {
+          count: currentCount,
+          lockedUntil: 0,
+        });
+        throw new UnauthorizedException(
+          `Invalid employee PIN. Attempt ${currentCount} of 5.`,
+        );
       }
     }
 
@@ -249,7 +268,10 @@ export class DevicesService {
     await this.deviceRepository.save(device);
 
     // Calculate effective permissions in real-time
-    const effectiveAccess = await this.subscriptionAccessService.calculateEffectiveFeatures(matchedUser);
+    const effectiveAccess =
+      await this.subscriptionAccessService.calculateEffectiveFeatures(
+        matchedUser,
+      );
 
     // Issue short-lived employee shift session JWT (12 hours)
     const sessionPayload = {
@@ -265,7 +287,9 @@ export class DevicesService {
       stationId: device.station_id,
     };
 
-    const sessionToken = this.jwtService.sign(sessionPayload, { expiresIn: '12h' });
+    const sessionToken = this.jwtService.sign(sessionPayload, {
+      expiresIn: '12h',
+    });
 
     return {
       sessionToken,
@@ -295,7 +319,9 @@ export class DevicesService {
 
     // Tenant isolation: cannot modify user of another merchant
     if (targetUser.merchantId !== currentUser.merchant.id) {
-      throw new ForbiddenException('Access denied to user of another merchant.');
+      throw new ForbiddenException(
+        'Access denied to user of another merchant.',
+      );
     }
 
     const pinHash = await bcrypt.hash(pin.trim(), 10);
@@ -328,7 +354,10 @@ export class DevicesService {
   /**
    * Revokes a device terminal, preventing further sessions.
    */
-  async revokeDevice(merchantId: number, deviceId: number): Promise<{ message: string }> {
+  async revokeDevice(
+    merchantId: number,
+    deviceId: number,
+  ): Promise<{ message: string }> {
     const device = await this.deviceRepository.findOne({
       where: { id: deviceId, merchant_id: merchantId },
     });
@@ -343,4 +372,3 @@ export class DevicesService {
     return { message: 'Device terminal access revoked.' };
   }
 }
-
