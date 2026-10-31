@@ -17,12 +17,14 @@ import { SubscriptionApplicationModule } from './subscription-application/subscr
 import { FeaturesModule } from './features/features.module';
 import { PlanFeaturesModule } from './plan-features/plan-features.module';
 import { SubscriptionPaymentsModule } from './subscription-payments/subscription-payments.module';
+import { NavigationModule } from './navigation/navigation.module';
 
 @Module({
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
   exports: [
     SubscriptionsService,
+    NavigationModule,
     TypeOrmModule.forFeature([
       FeatureShiftRole,
       UserFeatureOverride,
@@ -48,6 +50,7 @@ import { SubscriptionPaymentsModule } from './subscription-payments/subscription
     FeaturesModule,
     PlanFeaturesModule,
     SubscriptionPaymentsModule,
+    NavigationModule,
   ],
 })
 export class SubscriptionsModule {}
