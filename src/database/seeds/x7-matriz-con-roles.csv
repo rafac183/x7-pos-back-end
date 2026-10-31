@@ -1,6 +1,6 @@
 ﻿No.,Category,Application,Feature,Asignado,Columna1,Quick Service,Full Restaurant,Enterprise,Saas Owner,Merchant,Merchant admin,Manager,Cashier,Waiter,Bartender,Host,Busser,Cook,Delivery,Nota
-1,Platform SaaS,Central Backoffice,Aun por definir,,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
-1,Platform SaaS,Client Backoffice,Aun por definir,,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,Reportes del local
+1,Platform SaaS,Platform SaaS Dashboard,Aun por definir,,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
+1,Platform SaaS,Restaurant Dashboard,Aun por definir,,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,Reportes del local
 1,Platform SaaS,Companies,Companies,,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
 1,Platform SaaS,Merchants,Merchants,,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
 1,Platform SaaS,Subscription System,Applications,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,,,,,,,,,,,
@@ -9,7 +9,7 @@
 1,Platform SaaS,Subscription System,Plan applications,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,,,,,,,,,,,
 1,Platform SaaS,Subscription System,Plan features,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,,,,,,,,,,,
 1,Platform SaaS,Subscription System,Subcription Plans,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,,,,,,,,,,,
-1,Platform SaaS,Subscription System,Subscription Applications,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
+1,Platform SaaS,Subscription System,Subscription Applications,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,,,,,,,,,,,
 1,Platform SaaS,Subscription System,Subscription payments,Alejandro,Convertir en sub-module de Platform Saas,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
 1,Platform SaaS,Users,Users,,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,,,,,
 2,CORE,Billing / Transactions,Receipt items,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,
@@ -41,21 +41,22 @@
 4,Inventory,Food Costing,Recipe Ingredients,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,,,,Yes,,
 4,Inventory,Food Costing,Recipes,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,,,,Yes,,
 4,Inventory,Food Costing,Theoretical Cost,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,Datos de costo
-4,Inventory,Products/Inventory System,Category Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
-4,Inventory,Products/Inventory System,Modifiers Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
-4,Inventory,Products/Inventory System,Product Managment,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
-4,Inventory,Products/Inventory System,Purchase Orders Management,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
-4,Inventory,Products/Inventory System,Stock and Stock Movements Management,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,Yes,,,Yes,,Cocina y barra registran consumos y mermas
-4,Inventory,Products/Inventory System,Variants Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+4,Inventory,Products,Category Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+4,Inventory,Products,Modifiers Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+4,Inventory,Products,Product Managment,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+4,Inventory,Raw materials,Purchase Orders Management,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+4,Inventory,Raw materials,Stock and Stock Movements Management,Antonio,,,Yes,Yes,,Yes,Yes,Yes,,,Yes,,,Yes,,Cocina y barra registran consumos y mermas
+4,Inventory,Products,Variants Management,Antonio,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Dining System,Floor plans,Alejandro,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Dining System,Table asignments,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,Yes,,,,
 5,Restaurant Operations,Dining System,Table Zones,Alejandro,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Dining System,Tables,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,,,Busser: marcar mesa limpia o lista
 5,Restaurant Operations,Kitchen Display System,Kitchen Display Devices,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Kitchen Display System,Kitchen Event Log,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
-5,Restaurant Operations,Kitchen Display System,Kitchen Order Items,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,,Yes,Yes,,,Yes,,
-5,Restaurant Operations,Kitchen Display System,Kitchen Orders,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,,Yes,Yes,,,Yes,,Waiter: ver qué está listo para servir
+5,Restaurant Operations,Kitchen Display System,Kitchen Order Items,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,Yes,Yes,,,Yes,,
+5,Restaurant Operations,Kitchen Display System,Kitchen Orders,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,Yes,Yes,,,Yes,,Waiter: ver qué está listo para servir
 5,Restaurant Operations,Kitchen Display System,Kitchen Stations,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+5,Restaurant Operations,Kitchen Display System,Kitchen Performance,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,Feature nueva (117): falta crearla en el backend; solo manager (aprobado 2026-10-30)
 5,Restaurant Operations,POS,Order Discounts,,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,,,,,,,Aplicar descuentos requiere autoridad
 5,Restaurant Operations,POS,Order Items,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,
 5,Restaurant Operations,POS,Order Payments,,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,Yes,Yes,,,,,Cobro en mesa o barra
@@ -65,7 +66,7 @@
 5,Restaurant Operations,Cash Drawers,Cash Drawer History,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Cash Drawers,Cash Drawers,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,,,,,,,
 5,Restaurant Operations,Cash Drawers,Cash Transactions,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,,,,,,,
-5,Restaurant Operations,Shifts,Shift Assignment,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
+5,Restaurant Operations,Shifts,Shift Assignment,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
 5,Restaurant Operations,Shifts,Shifts,Miguel,,Yes,Yes,Yes,,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Cada uno ve sus propios turnos; manager ve todos
 5,Restaurant Operations,Tips,Tip movements,Miguel,,,Yes,Yes,,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,,,Cada uno ve sus propios movimientos
 5,Restaurant Operations,Tips,Tip pool members,Miguel,,,Yes,Yes,,Yes,Yes,Yes,,,,,,,,
