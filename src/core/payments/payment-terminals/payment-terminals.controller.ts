@@ -25,6 +25,9 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
+import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
+import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -59,8 +62,9 @@ const READ_SCOPES = [
   type: ErrorResponse,
 })
 @Controller('v1/merchants/:companyId/payment-terminals')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+@RequireFeature(SUBSCRIPTION_FEATURE_IDS.ORDER_PAYMENTS)
+@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
+@Roles(UserRole.MERCHANT_ADMIN)
 @Scopes(Scope.ADMIN_PORTAL, Scope.MERCHANT_WEB)
 export class PaymentTerminalsController {
   constructor(private readonly terminalsService: PaymentTerminalsService) {}
@@ -94,7 +98,7 @@ export class PaymentTerminalsController {
   }
 
   @Get()
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(...READ_SCOPES)
   @ApiOperation({
     summary: "List the company's payment terminals",
@@ -111,7 +115,7 @@ export class PaymentTerminalsController {
   }
 
   @Get(':id')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(...READ_SCOPES)
   @ApiOperation({ summary: 'Get a payment terminal' })
   @ApiParam({ name: 'id', type: Number, example: 1 })

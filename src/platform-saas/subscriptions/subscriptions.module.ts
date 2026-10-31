@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CompanySubscription } from './company-subscriptions/entities/company-subscription.entity';
 import { SubscriptionPayment } from './subscription-payments/entity/subscription-payments.entity';
+import { FeatureShiftRole } from './entities/feature-shift-role.entity';
+import { UserFeatureOverride } from './entities/user-feature-override.entity';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
 import { SubscriptionPlanModule } from './subscription-plan/subscription-plan.module';
@@ -16,9 +18,17 @@ import { SubscriptionPaymentsModule } from './subscription-payments/subscription
 @Module({
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
-  exports: [SubscriptionsService],
+  exports: [
+    SubscriptionsService,
+    TypeOrmModule.forFeature([FeatureShiftRole, UserFeatureOverride]),
+  ],
   imports: [
-    TypeOrmModule.forFeature([CompanySubscription, SubscriptionPayment]),
+    TypeOrmModule.forFeature([
+      CompanySubscription,
+      SubscriptionPayment,
+      FeatureShiftRole,
+      UserFeatureOverride,
+    ]),
     SubscriptionPlanModule,
     MerchantSubscriptionModule,
     ApplicationsModule,

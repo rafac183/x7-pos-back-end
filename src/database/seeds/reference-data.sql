@@ -1,5 +1,5 @@
 -- Datos de referencia: obligatorios en todos los entornos, producción incluida.
--- Planes de suscripción 1-3, aplicaciones, features 1-116 (sus ids fijos están en
+-- Planes de suscripción 1-3, aplicaciones, features 1-115 (sus ids fijos están en
 -- src/common/subscription/subscription-feature-ids.ts), qué incluye cada plan y los textos
 -- que muestra la página de onboarding.
 --
@@ -11,6 +11,8 @@
 -- Junction data only (safe if no unexpected FKs point at these rows)
 DELETE FROM plan_features WHERE subscription_plan_id IN (1, 2, 3);
 DELETE FROM plan_applications WHERE subscriptionplan_id IN (1, 2, 3);
+DELETE FROM plan_features WHERE feature_id = 48;
+DELETE FROM feature WHERE id = 48;
 
 INSERT INTO subscription_plan (id, name, description, price, "billingCycle", status, slug, badge, recommended, is_custom_pricing, price_label) VALUES
   (1, 'Essential', 'Quick service operations with core POS tooling for lean teams.', 69.00, 'monthly', 'active', 'essential', 'Quick Service', false, false, NULL),
@@ -111,7 +113,6 @@ INSERT INTO feature (id, name, description, "Unit", status) VALUES
   (45, 'Product Managment', 'Product Managment managed from Products/Inventory System application', 'Unit', 'active'),
   (46, 'Purchase Orders Management', 'Purchase Orders Management managed from Products/Inventory System application', 'Unit', 'active'),
   (47, 'Stock and Stock Movements Management', 'Stock and Stock Movements Management managed from Products/Inventory System application', 'Unit', 'active'),
-  (48, 'Suppliers Management', 'Suppliers Management managed from Products/Inventory System application', 'Unit', 'active'),
   (49, 'Variants Management', 'Variants Management managed from Products/Inventory System application', 'Unit', 'active'),
   (50, 'Floor plans', 'Floor plans managed from Dining System application', 'Unit', 'active'),
   (51, 'Table asignments', 'Table asignments managed from Dining System application', 'Unit', 'active'),
@@ -341,7 +342,6 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (2, 45, 0, 'active'),
   (2, 46, 0, 'active'),
   (2, 47, 0, 'active'),
-  (2, 48, 0, 'active'),
   (2, 49, 0, 'active'),
   (2, 50, 0, 'active'),
   (2, 51, 0, 'active'),
@@ -441,7 +441,6 @@ INSERT INTO plan_features (subscription_plan_id, feature_id, limit_value, status
   (3, 45, 0, 'active'),
   (3, 46, 0, 'active'),
   (3, 47, 0, 'active'),
-  (3, 48, 0, 'active'),
   (3, 49, 0, 'active'),
   (3, 50, 0, 'active'),
   (3, 51, 0, 'active'),

@@ -49,6 +49,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { ErrorResponse } from 'src/common/dtos/error-response.dto';
 import { TipAllocationRole } from './constants/tip-allocation-role.enum';
+import { ShiftRole } from '../../shift/shifts/constants/shift-role.enum';
 
 @ApiTags('Restaurant operations - Tips - Tip Allocations')
 @ApiBearerAuth()
@@ -77,7 +78,7 @@ export class TipAllocationsController {
   }
 
   @Post()
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -133,7 +134,7 @@ export class TipAllocationsController {
   }
 
   @Get()
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN, UserRole.MERCHANT_USER)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -179,14 +180,25 @@ export class TipAllocationsController {
     @Request() req: ExpressRequest & { user?: AuthenticatedUser },
   ) {
     const authenticatedUserMerchantId = this.merchantIdOf(req);
+    const user = req.user;
+    const isManagerOrAdmin =
+      user?.role === UserRole.SUPER_ADMIN ||
+      user?.role === UserRole.MERCHANT_ADMIN ||
+      user?.shiftRole === ShiftRole.MANAGER;
+
+    const effectiveQuery = { ...query };
+    if (!isManagerOrAdmin && user?.collaboratorId) {
+      effectiveQuery.collaboratorId = user.collaboratorId;
+    }
+
     return this.tipAllocationsService.findAll(
-      query,
+      effectiveQuery,
       authenticatedUserMerchantId,
     );
   }
 
   @Get(':id')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -220,7 +232,7 @@ export class TipAllocationsController {
   }
 
   @Put(':id')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,
@@ -269,7 +281,7 @@ export class TipAllocationsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+  @Roles(UserRole.MERCHANT_ADMIN)
   @Scopes(
     Scope.ADMIN_PORTAL,
     Scope.MERCHANT_WEB,

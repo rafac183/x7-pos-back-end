@@ -54,7 +54,11 @@ const MERCHANT_ASSIGNABLE_SCOPES: readonly Scope[] = [
 ];
 
 function isPortalRole(role: UserRole | undefined): boolean {
-  return role === UserRole.PORTAL_ADMIN || role === UserRole.PORTAL_USER;
+  return (
+    role === UserRole.SUPER_ADMIN ||
+    role === UserRole.PORTAL_ADMIN ||
+    role === UserRole.PORTAL_USER
+  );
 }
 
 @Injectable()
@@ -450,7 +454,10 @@ export class UsersService {
     user: User,
     authenticatedUser: AuthenticatedUser,
   ): boolean {
-    if (authenticatedUser.role === UserRole.PORTAL_ADMIN) {
+    if (
+      authenticatedUser.role === UserRole.PORTAL_ADMIN ||
+      authenticatedUser.role === UserRole.SUPER_ADMIN
+    ) {
       return true;
     }
 
@@ -480,7 +487,10 @@ export class UsersService {
     authenticatedUser: AuthenticatedUser,
     target?: User,
   ): void {
-    if (authenticatedUser.role === UserRole.PORTAL_ADMIN) {
+    if (
+      authenticatedUser.role === UserRole.PORTAL_ADMIN ||
+      authenticatedUser.role === UserRole.SUPER_ADMIN
+    ) {
       return;
     }
 

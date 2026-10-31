@@ -43,7 +43,7 @@ describe('Production seeds (e2e)', () => {
       expect(await counts()).toEqual(first);
       expect(first).toMatchObject({
         plans: 3,
-        features: 116,
+        features: 115,
         display_features: 12,
       });
     });

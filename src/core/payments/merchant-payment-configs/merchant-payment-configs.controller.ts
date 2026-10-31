@@ -25,6 +25,9 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { FeatureAccessGuard } from 'src/auth/guards/feature-access.guard';
+import { RequireFeature } from 'src/auth/decorators/require-feature.decorator';
+import { SUBSCRIPTION_FEATURE_IDS } from 'src/common/subscription/subscription-feature-ids';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Scopes } from 'src/auth/decorators/scopes.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -50,9 +53,10 @@ import {
   type: ErrorResponse,
 })
 @Controller('v1/merchants/:companyId/payment-configs')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@RequireFeature(SUBSCRIPTION_FEATURE_IDS.ORDER_PAYMENTS)
+@UseGuards(JwtAuthGuard, RolesGuard, FeatureAccessGuard)
 // Credenciales de pago: solo administradores, desde el portal o el backoffice web
-@Roles(UserRole.PORTAL_ADMIN, UserRole.MERCHANT_ADMIN)
+@Roles(UserRole.MERCHANT_ADMIN)
 @Scopes(Scope.ADMIN_PORTAL, Scope.MERCHANT_WEB)
 export class MerchantPaymentConfigsController {
   constructor(private readonly configsService: MerchantPaymentConfigsService) {}
