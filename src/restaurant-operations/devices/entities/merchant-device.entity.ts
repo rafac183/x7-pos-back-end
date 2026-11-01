@@ -34,7 +34,10 @@ export class MerchantDevice {
   merchant_id: number;
 
   @ManyToOne(() => Merchant, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'merchant_id' })
+  @JoinColumn({
+    name: 'merchant_id',
+    foreignKeyConstraintName: 'FK_merchant_device_merchant',
+  })
   merchant: Merchant;
 
   @ApiProperty({
@@ -54,7 +57,10 @@ export class MerchantDevice {
   station_id: number | null;
 
   @ManyToOne(() => KitchenStation, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'station_id' })
+  @JoinColumn({
+    name: 'station_id',
+    foreignKeyConstraintName: 'FK_merchant_device_station',
+  })
   station: KitchenStation | null;
 
   @ApiProperty({

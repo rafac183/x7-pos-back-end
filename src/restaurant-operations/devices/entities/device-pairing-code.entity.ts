@@ -14,7 +14,7 @@ import { User } from '../../../platform-saas/users/entities/user.entity';
 import { DeviceType } from '../constants/device-type.constant';
 
 @Entity('device_pairing_code')
-@Index('IDX_device_pairing_code_hash', ['code_hash'], { unique: true })
+@Index('IDX_device_pairing_code_hash', ['code_hash'])
 @Index('IDX_device_pairing_code_merchant_id', ['merchant_id'])
 @Index('IDX_device_pairing_code_expires_at', ['expires_at'])
 @Index('IDX_device_pairing_code_used_at', ['used_at'])
@@ -41,7 +41,10 @@ export class DevicePairingCode {
   merchant_id: number;
 
   @ManyToOne(() => Merchant, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'merchant_id' })
+  @JoinColumn({
+    name: 'merchant_id',
+    foreignKeyConstraintName: 'FK_device_pairing_code_merchant',
+  })
   merchant: Merchant;
 
   @ApiProperty({
@@ -61,7 +64,10 @@ export class DevicePairingCode {
   station_id: number | null;
 
   @ManyToOne(() => KitchenStation, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'station_id' })
+  @JoinColumn({
+    name: 'station_id',
+    foreignKeyConstraintName: 'FK_device_pairing_code_station',
+  })
   station: KitchenStation | null;
 
   @ApiProperty({
@@ -87,7 +93,10 @@ export class DevicePairingCode {
   created_by: number;
 
   @ManyToOne(() => User, { nullable: false, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'created_by' })
+  @JoinColumn({
+    name: 'created_by',
+    foreignKeyConstraintName: 'FK_device_pairing_code_creator',
+  })
   creator: User;
 
   @ApiProperty({

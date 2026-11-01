@@ -40,6 +40,7 @@ export class FeatureShiftRole {
   @Column({
     type: 'enum',
     enum: ShiftRole,
+    enumName: 'shift_role_enum',
     name: 'shift_role',
   })
   @Index('IDX_feature_shift_role_shift_role')

@@ -4,6 +4,14 @@ export class CreateMerchantDeviceAndPairingTables1793800000000 implements Migrat
   name = 'CreateMerchantDeviceAndPairingTables1793800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // 0. Add enum values to users_scope_enum
+    await queryRunner.query(`
+      ALTER TYPE "public"."users_scope_enum" ADD VALUE IF NOT EXISTS 'kitchen_device';
+    `);
+    await queryRunner.query(`
+      ALTER TYPE "public"."users_scope_enum" ADD VALUE IF NOT EXISTS 'merchant_device';
+    `);
+
     // 1. Add pin_hash column to users table
     await queryRunner.query(`
       ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "pin_hash" character varying(128);
