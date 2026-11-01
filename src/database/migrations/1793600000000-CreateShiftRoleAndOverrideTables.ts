@@ -16,7 +16,7 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
       SELECT setval(pg_get_serial_sequence('feature', 'id'), (SELECT COALESCE(MAX(id), 1) FROM feature));
     `);
 
-    // 0.1 Update plan_features alignments from approved matrix
+    // 0.1 Update plan_features alignments from approved matrix (safe for blank e2e databases)
     // Remove 56, 57 from plan 1 (All KDS moves to Full Restaurant)
     await queryRunner.query(`
       DELETE FROM "plan_features" WHERE "subscription_plan_id" = 1 AND "feature_id" IN (56, 57);
@@ -24,7 +24,9 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
     // Add 68 to plan 1 (Shift Assignment in Quick Service)
     await queryRunner.query(`
       INSERT INTO "plan_features" ("subscription_plan_id", "feature_id", "limit_value", "status")
-      VALUES (1, 68, 0, 'active')
+      SELECT 1, 68, 0, 'active'
+      WHERE EXISTS (SELECT 1 FROM "subscription_plan" WHERE "id" = 1)
+        AND EXISTS (SELECT 1 FROM "feature" WHERE "id" = 68)
       ON CONFLICT DO NOTHING;
     `);
     // Remove 81 from plan 2 (Table Turnover Optimization in Enterprise only)
@@ -34,7 +36,10 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
     // Add 117 to plan 2 and 3
     await queryRunner.query(`
       INSERT INTO "plan_features" ("subscription_plan_id", "feature_id", "limit_value", "status")
-      VALUES (2, 117, 0, 'active'), (3, 117, 0, 'active')
+      SELECT p.id, 117, 0, 'active'
+      FROM "subscription_plan" p
+      WHERE p.id IN (2, 3)
+        AND EXISTS (SELECT 1 FROM "feature" WHERE "id" = 117)
       ON CONFLICT DO NOTHING;
     `);
 
@@ -86,10 +91,11 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
       ALTER TABLE "user_feature_override" ENABLE ROW LEVEL SECURITY;
     `);
 
-    // 3. Seed Shift-Roles Matrix (175 records)
+    // 3. Seed Shift-Roles Matrix (175 records) — only for features that exist
     await queryRunner.query(`
       INSERT INTO "feature_shift_role" ("feature_id", "shift_role")
-      VALUES
+      SELECT v.feature_id, v.shift_role::"public"."shift_role_enum"
+      FROM (VALUES
         (2, 'manager'),
         (14, 'manager'),
         (14, 'cashier'),
@@ -265,6 +271,8 @@ export class CreateShiftRoleAndOverrideTables1793600000000 implements MigrationI
         (114, 'manager'),
         (115, 'manager'),
         (116, 'manager')
+      ) AS v(feature_id, shift_role)
+      WHERE EXISTS (SELECT 1 FROM "feature" f WHERE f.id = v.feature_id)
       ON CONFLICT ("feature_id", "shift_role") DO NOTHING
     `);
   }

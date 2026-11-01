@@ -168,7 +168,20 @@ export class CreateNavigationCatalogTables1793700000000 implements MigrationInte
 
     // 6. Seed nav_item
     await queryRunner.query(`
-      INSERT INTO "nav_item" ("surface", "application_id", "feature_id", "code", "label", "icon", "description", "route", "sort_order", "kind", "status") VALUES
+      INSERT INTO "nav_item" ("surface", "application_id", "feature_id", "code", "label", "icon", "description", "route", "sort_order", "kind", "status")
+      SELECT
+        v.surface,
+        v.application_id,
+        CASE WHEN v.feature_id IS NOT NULL AND EXISTS (SELECT 1 FROM "feature" f WHERE f.id = v.feature_id) THEN v.feature_id ELSE NULL END,
+        v.code,
+        v.label,
+        v.icon,
+        v.description,
+        v.route,
+        v.sort_order,
+        v.kind,
+        v.status
+      FROM (VALUES
         ('merchant_web', 1, 1, 'saas-dashboard', 'DESARROLLADO PERO FALTA PULIR', 'circle', 'Desarrollado pero falta pulir view.', '/saas-admin', 1, 'screen', 'live'),
         ('saas_web', 1, 1, 'saas-dashboard', 'DESARROLLADO PERO FALTA PULIR', 'circle', 'Desarrollado pero falta pulir view.', '/saas-admin', 1, 'screen', 'live'),
         ('merchant_web', 2, 2, 'reports', 'DESARROLLADO PERO FALTA PULIR', 'circle', 'Desarrollado pero falta pulir view.', '/app/client-backoffice/reports', 1, 'screen', 'live'),
@@ -328,6 +341,7 @@ export class CreateNavigationCatalogTables1793700000000 implements MigrationInte
         ('merchant_web', 28, 114, 'marketing-message-log', 'MARKETING MESSAGE LOG', 'circle', 'Marketing Message Log view.', '/app/marketing-system/marketing-message-log', 8, 'screen', 'live'),
         ('merchant_web', 28, 115, 'marketing-segment', 'MARKETING SEGMENT', 'circle', 'Marketing Segment view.', '/app/marketing-system/marketing-segment', 9, 'screen', 'live'),
         ('merchant_web', 28, 116, 'marketing-segment-rule', 'MARKETING SEGMENT RULE', 'circle', 'Marketing Segment Rule view.', '/app/marketing-system/marketing-segment-rule', 10, 'screen', 'live')
+      ) AS v(surface, application_id, feature_id, code, label, icon, description, route, sort_order, kind, status)
       ON CONFLICT ("surface", "code") DO UPDATE SET
         "application_id" = EXCLUDED."application_id",
         "feature_id" = EXCLUDED."feature_id",
