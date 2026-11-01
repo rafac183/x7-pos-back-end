@@ -40,7 +40,8 @@ export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @ApiOperation({
-    summary: 'Generate 6-character ephemeral pairing code for terminal hardware onboarding',
+    summary:
+      'Generate 6-character ephemeral pairing code for terminal hardware onboarding',
   })
   @ApiResponse({
     status: 201,
@@ -59,7 +60,8 @@ export class DevicesController {
   }
 
   @ApiOperation({
-    summary: 'Exchange ephemeral pairing code for long-lived physical device token',
+    summary:
+      'Exchange ephemeral pairing code for long-lived physical device token',
   })
   @ApiResponse({
     status: 200,
@@ -73,7 +75,8 @@ export class DevicesController {
   }
 
   @ApiOperation({
-    summary: 'Authenticate employee on paired terminal using rapid 4-6 digit numeric PIN',
+    summary:
+      'Authenticate employee on paired terminal using rapid 4-6 digit numeric PIN',
   })
   @ApiResponse({
     status: 200,
@@ -92,7 +95,8 @@ export class DevicesController {
   }
 
   @ApiOperation({
-    summary: 'Configure or update 4-6 digit numeric PIN for an employee account',
+    summary:
+      'Configure or update 4-6 digit numeric PIN for an employee account',
   })
   @ApiResponse({
     status: 200,
@@ -112,7 +116,8 @@ export class DevicesController {
   }
 
   @ApiOperation({
-    summary: 'List physical terminal devices registered to the current merchant branch',
+    summary:
+      'List physical terminal devices registered to the current merchant branch',
   })
   @ApiResponse({
     status: 200,
@@ -147,4 +152,3 @@ export class DevicesController {
     return this.devicesService.revokeDevice(user.merchant.id, id);
   }
 }
-

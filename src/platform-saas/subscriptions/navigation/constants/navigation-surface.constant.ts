@@ -18,4 +18,3 @@ export const ALL_NAVIGATION_SURFACES: NavigationSurface[] = [
   NavigationSurface.APP_CASHIER,
   NavigationSurface.APP_HOST,
 ];
-

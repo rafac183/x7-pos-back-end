@@ -51,4 +51,3 @@ export class NavigationController {
     return this.navigationService.getNavigationTree(user, query.surface);
   }
 }
-

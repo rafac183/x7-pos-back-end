@@ -20,4 +20,3 @@ export class GetNavigationQueryDto {
   })
   surface: NavigationSurface;
 }
-
